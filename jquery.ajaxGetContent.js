@@ -4,6 +4,7 @@
  *  Requires: jQuery BBQ, http://benalman.com/projects/jquery-bbq-plugin/
  *	
  *	More info at:
+ *  www.implico.pl/lang-en/ajaxgetcontent_dynamic_ajax_website,7.html
  *	info@implico.pl
  *	
  *	Copyright (c) 2012 Implico Group
