@@ -30,6 +30,9 @@
 			//whether to use content cache
 			useCache : true,
 			
+			//force bookmark linking
+			forceBookmarkLinking : false,
+			
 			//forced get params
 			params : {},
 			
@@ -56,8 +59,7 @@
 			
 		}, options);
 		
-		var usePushState = history.pushState;
-		//$.fn.ajaxGetContent.usePushState = usePushState;
+		var usePushState = !options.forceBookmarkLinking && history.pushState;
 		
 		var cache = new Array();
 		
@@ -69,7 +71,6 @@
 		
 		//indicates whether there was any click since plugin started
 		wasClicked = $('body').data('ajaxGetContent');
-		
 		
 		var sendReceive = function (bool_data, url_status)
 		{
@@ -118,7 +119,9 @@
 				if (url_status == 'success')
 				{
 					if (options.useCache && $.fn.ajaxGetContent.lastClickedUrl)
+					{
 						cache[$.fn.ajaxGetContent.lastClickedUrl] = bool_data;
+					}
 				}
 				else
 				{
