@@ -172,6 +172,22 @@
 			}
 		}
 
+		//gets current absolute url
+		$.fn.ajaxGetContent.getCurrentUrl = function()
+		{
+			if (usePushState)
+			{
+				var url = new String(location.href);
+				var startPos = url.indexOf('//');
+				startPos = startPos >=0 ? startPos+2 : 0;
+				url = url.substr(url.indexOf('/', startPos));
+				if (url.length == 0)
+					url = '/';
+				
+				return url;
+			}
+			else return $.param.fragment();
+		}
 		
 		//binds hashchange event
 		if (!$('body').data('ajaxGetContent'))
