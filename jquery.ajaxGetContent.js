@@ -76,13 +76,19 @@
 		{
 			if (typeof bool_data == 'boolean')
 			{
+				if ($.fn.ajaxGetContent.ajaxHandler)
+				{
+					$.fn.ajaxGetContent.ajaxHandler.abort();
+					$.fn.ajaxGetContent.ajaxHandler = null;
+				}
+				
+				$.fn.ajaxGetContent.lastClickedUrl = url_status;
 				if (options.useCache && (url_status in cache))
 				{
 					options.onSend(url_status);
 					sendReceive(cache[url_status], 'success');
 					return;
 				}
-				$.fn.ajaxGetContent.lastClickedUrl = url_status;
 				
 				var data = new Array();
 				
@@ -107,8 +113,6 @@
 				});
 				
 				data.push ({ name: options.requestParameter, value:'on'});
-				if ($.fn.ajaxGetContent.ajaxHandler)
-					$.fn.ajaxGetContent.ajaxHandler.abort();
 				$.fn.ajaxGetContent.ajaxHandler = $.ajax({ url: url_status, data: data, type : 'GET', success : sendReceive, error : sendReceive, context : this });
 				options.onSend(url_status);
 			}
