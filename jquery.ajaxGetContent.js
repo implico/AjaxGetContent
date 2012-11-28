@@ -289,7 +289,7 @@
 				$this .data('ajaxGetContent', true);
 				$this .click(function(event)
 				{
-					if (event.which != 1)
+					if (event && event.which && event.which != 1)
 						return true;
 					
 					//check if url is a base url, if not - load baseUrl page with ajax link
