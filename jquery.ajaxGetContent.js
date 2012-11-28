@@ -287,8 +287,11 @@
 			{
 				
 				$this .data('ajaxGetContent', true);
-				$this .click(function()
+				$this .click(function(event)
 				{
+					if (event.which != 1)
+						return true;
+					
 					//check if url is a base url, if not - load baseUrl page with ajax link
 					var hrefNoAnchor = new String(window.location.href);
 					if (hrefNoAnchor.indexOf('#') >= 0)
