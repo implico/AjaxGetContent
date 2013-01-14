@@ -69,8 +69,8 @@
 		$.fn.ajaxGetContent.lastClickedUrl = null;
 		$.fn.ajaxGetContent.ajaxHandler = null;
 		
-		//indicates whether there was any click since plugin started
-		wasClicked = $('body').data('ajaxGetContent');
+		//indicates whether the plugin is ready (in Chrome & Safari popstate is fired also when entering a website)
+		wasLoaded = $('body').data('ajaxGetContent');
 		
 		var sendReceive = function (bool_data, url_status)
 		{
@@ -145,7 +145,7 @@
 					url = href.location;
 				
 				history.pushState( {} , '', url);
-				wasClicked = true;
+				//wasClicked = true;
 				$(window).trigger('popstate');
 			}
 			else
@@ -198,12 +198,17 @@
 		{
 			$(window).bind( usePushState ? 'popstate' : 'hashchange', function( event )
 			{
-				if (!(usePushState && !wasClicked))	//in Chrome & Safari popstate is fired also when entering a website
+				if (!(usePushState && !wasLoaded))
 					sendReceive(true, usePushState ? location.href : event.fragment);
 			});
 			
 			$('body').data('ajaxGetContent', true);
 		}
+		
+		//set the wasLoaded indicator to true after eventual popstate event is fired right after loading the page (Chrome&Safari)
+		$(window).load(function() {
+			setTimeout(function() { wasLoaded=true; }, 1);
+		});
 
 		
 		
@@ -245,7 +250,8 @@
 			});
 			
 			//validating url
-			var invalidUrl = 	(href.substr(0,1) != '/') || (href.indexOf('#') >= 0); 
+			var targetAttr = $this.attr('target');
+			var invalidUrl = 	(href.substr(0,1) != '/') || (href.indexOf('#') >= 0) || (typeof targetAttr !== 'undefined' && targetAttr !== false); 
 								
 
 			//checking excluding url fragments
@@ -315,7 +321,7 @@
 					$this.data('options', options);
 					$.fn.ajaxGetContent.lastClickedElement = $this;
 					
-					wasClicked = true;
+					//wasClicked = true;
 					
 					if (usePushState)
 					{
