@@ -1,5 +1,6 @@
 /*	
- *	jQuery AjaxGetContent 1.2
+ *	jQuery AjaxGetContent 1.3
+
 
  *  Requires: jQuery BBQ, http://benalman.com/projects/jquery-bbq-plugin/
  *	
@@ -36,12 +37,6 @@
 			//forced get params
 			params : {},
 			
-			//url fragments not affected when found
-			excludeUrl : [],
-			
-			//selectors for elements not to be affected when matched
-			excludeSelector : [],
-			
 			//attributes for elements not to be affected when matched
 			excludeAttr : { 'rel' : 'lightbox', 'rel' : 'nofollow' },
 			
@@ -50,6 +45,13 @@
 				//avoid files
 				return (href.length == 0) || (href.substr(href.length-1, 1) == '/') || (href.substr(href.length-5, 5) == '.html'); 
 			},
+			
+			//invoked while A element checking
+			onElementCheck : function(element) {
+				//avoid elements with no-ajax-load class
+				return !element.hasClass('no-ajax-load'); 
+			},
+			
 			
 			//invoked after sending request
 			onSend : function(url) {},
@@ -61,7 +63,8 @@
 		
 		var usePushState = !options.forceBookmarkLinking && history.pushState;
 		
-		var cache = new Array();
+		if (!$('body').data('ajaxGetContent'))
+			$.fn.ajaxGetContent.cache = new Array();
 		
 		var mainElement = this;
 		
@@ -83,10 +86,10 @@
 				}
 				
 				$.fn.ajaxGetContent.lastClickedUrl = url_status;
-				if (options.useCache && (url_status in cache))
+				if (options.useCache && (url_status in $.fn.ajaxGetContent.cache))
 				{
 					options.onSend(url_status);
-					sendReceive(cache[url_status], 'success');
+					sendReceive($.fn.ajaxGetContent.cache[url_status], 'success');
 					return;
 				}
 				
@@ -112,9 +115,10 @@
 						});
 				});
 				
+				options.onSend(url_status);
+				
 				data.push ({ name: options.requestParameter, value:'on'});
 				$.fn.ajaxGetContent.ajaxHandler = $.ajax({ url: url_status, data: data, type : 'GET', success : sendReceive, error : sendReceive, context : this });
-				options.onSend(url_status);
 			}
 			else
 			{
@@ -124,7 +128,7 @@
 				{
 					if (options.useCache && $.fn.ajaxGetContent.lastClickedUrl)
 					{
-						cache[$.fn.ajaxGetContent.lastClickedUrl] = bool_data;
+						$.fn.ajaxGetContent.cache[$.fn.ajaxGetContent.lastClickedUrl] = bool_data;
 					}
 				}
 				else
@@ -193,7 +197,13 @@
 			else return $.param.fragment();
 		}
 		
-		//binds hashchange event
+		//clears cache
+		$.fn.ajaxGetContent.clearCache = function()
+		{
+			$.fn.ajaxGetContent.cache = new Array();
+		}
+		
+		//binds popstate/hashchange event
 		if (!$('body').data('ajaxGetContent'))
 		{
 			$(window).bind( usePushState ? 'popstate' : 'hashchange', function( event )
@@ -206,8 +216,14 @@
 		}
 		
 		//set the wasLoaded indicator to true after eventual popstate event is fired right after loading the page (Chrome&Safari)
+		//fire hashchange event for bookmark linking
 		$(window).load(function() {
-			setTimeout(function() { wasLoaded=true; }, 1);
+			setTimeout(function() {
+				wasLoaded = true;
+				
+				if (!usePushState && ($.param.fragment() != ''))
+					$(window).trigger('hashchange');
+			}, 1);
 		});
 
 		
@@ -238,36 +254,16 @@
 			 *  checking conditions
 			 */
 			
-			//checking excluding selectors
-			var excludeSelector = false;
-			$.each(options.excludeSelector, function(i, v)
-			{
-				if ($this.is(v))
-				{
-					excludeSelector = true;
-					return;
-				}
-			});
-			
 			//validating url
 			var targetAttr = $this.attr('target');
-			var invalidUrl = 	(href.substr(0,1) != '/') || (href.indexOf('#') >= 0) || (typeof targetAttr !== 'undefined' && targetAttr !== false); 
+			var invalidUrl = 	/*(href.substr(0,1) != '/') || */(href.indexOf('#') >= 0) || (typeof targetAttr !== 'undefined' && targetAttr !== false); 
 								
 
-			//checking excluding url fragments
-			var excludeUrl = false
-			$.each(options.excludeUrl, function(i, v)
-			{
-				if (href.indexOf(v) >= 0)
-				{
-					excludeUrl = true;
-					return;
-				}
-			});
-			
 			//checking onUrlCheck callback
 			var onHrefCheck = options.onHrefCheck(href, hrefParams);
 				
+			//checking onElementCheck callback
+			var onElementCheck = options.onElementCheck($this);
 			
 			//checking excluding element attributes
 			var excludeAttr = false;
@@ -289,7 +285,7 @@
 			 */
 					
 			
-			if (!alreadyEnabled && !excludeSelector && !invalidUrl && !excludeUrl && onHrefCheck && !excludeAttr && !hasOnClick)
+			if (!alreadyEnabled && !invalidUrl && onHrefCheck && onElementCheck && !excludeAttr && !hasOnClick)
 			{
 				
 				$this .data('ajaxGetContent', true);
