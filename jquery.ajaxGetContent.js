@@ -43,7 +43,7 @@
 			//invoked while target url checking
 			onHrefCheck : function(href, hrefParams) {
 				//avoid files
-				return (href.length == 0) || (href.substr(href.length-1, 1) == '/') || (href.substr(href.length-5, 5) == '.html'); 
+				return (href.length == 0) || (href.substr(href.length-1, 1) == '/') || (href.substr(href.length-5, 5) == '.html') || (href.substr(href.length-4, 4) == '.php'); 
 			},
 			
 			//invoked while A element checking
