@@ -1,4 +1,5 @@
 /*	
+
  *	jQuery AjaxGetContent 1.3
 
 
@@ -43,13 +44,13 @@
 			//invoked while target url checking
 			onHrefCheck : function(href, hrefParams) {
 				//avoid files
-				return (href.length == 0) || (href.substr(href.length-1, 1) == '/') || (href.substr(href.length-5, 5) == '.html') || (href.substr(href.length-4, 4) == '.php'); 
+				return (href.length > 0) && ((href.substr(href.length-1, 1) == '/') || (href.substr(href.length-5, 5) == '.html') || (href.substr(href.length-4, 4) == '.php')); 
 			},
 			
 			//invoked while A element checking
 			onElementCheck : function(element) {
 				//avoid elements with no-ajax-load class
-				return !element.hasClass('no-ajax-load'); 
+				return !element.hasClass('no-ajax-load') && (element.attr('rel') != 'nofollow'); 
 			},
 			
 			
@@ -146,7 +147,7 @@
 			if (usePushState)
 			{
 				if (url == null)
-					url = href.location;
+					url = location.href;
 				
 				history.pushState( {} , '', url);
 				//wasClicked = true;
