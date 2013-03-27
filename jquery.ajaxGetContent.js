@@ -236,6 +236,8 @@
 			var alreadyEnabled = $this.data('ajaxGetContent');
 
 			var href = $this.attr('href');
+			if (!href)
+				return true;
 			var hrefParams = new String();
 			
 			var ssl = location.href.substr(0, 5) != 'http:';
