@@ -1,8 +1,8 @@
 /*	
 
- *	jQuery AjaxGetContent 1.3
-
-
+ *	jQuery AjaxGetContent 1.3.1
+ *
+ *
  *  Requires: jQuery BBQ, http://benalman.com/projects/jquery-bbq-plugin/
  *	
  *	More info at:
@@ -62,7 +62,8 @@
 			
 		}, options);
 		
-		var usePushState = !options.forceBookmarkLinking && history.pushState;
+		if (!$('body').data('ajaxGetContent'))
+			$.fn.ajaxGetContent.usePushState = Boolean(!options.forceBookmarkLinking && history.pushState);
 		
 		if (!$('body').data('ajaxGetContent'))
 			$.fn.ajaxGetContent.cache = new Array();
@@ -74,7 +75,7 @@
 		$.fn.ajaxGetContent.ajaxHandler = null;
 		
 		//indicates whether the plugin is ready (in Chrome & Safari popstate is fired also when entering a website)
-		wasLoaded = $('body').data('ajaxGetContent');
+		wasLoaded = true;//$('body').data('ajaxGetContent');
 		
 		var sendReceive = function (bool_data, url_status)
 		{
@@ -144,13 +145,12 @@
 		$.fn.ajaxGetContent.load = function(url)
 		{
 			
-			if (usePushState)
+			if ($.fn.ajaxGetContent.usePushState)
 			{
 				if (url == null)
 					url = location.href;
 				
 				history.pushState( {} , '', url);
-				//wasClicked = true;
 				$(window).trigger('popstate');
 			}
 			else
@@ -184,7 +184,7 @@
 		//gets current absolute url
 		$.fn.ajaxGetContent.getCurrentUrl = function()
 		{
-			if (usePushState)
+			if ($.fn.ajaxGetContent.usePushState)
 			{
 				var url = new String(location.href);
 				var startPos = url.indexOf('//');
@@ -204,25 +204,30 @@
 			$.fn.ajaxGetContent.cache = new Array();
 		}
 		
-		//binds popstate/hashchange event
-		if (!$('body').data('ajaxGetContent'))
+		//binds url change event
+		var bindUrlChangeEvent = function()
 		{
-			$(window).bind( usePushState ? 'popstate' : 'hashchange', function( event )
+			$(window).bind( $.fn.ajaxGetContent.usePushState ? 'popstate' : 'hashchange', function( event )
 			{
-				if (!(usePushState && !wasLoaded))
-					sendReceive(true, usePushState ? location.href : event.fragment);
+				if (!($.fn.ajaxGetContent.usePushState && !wasLoaded))
+					sendReceive(true, $.fn.ajaxGetContent.usePushState ? location.href : event.fragment);
 			});
 			
 			$('body').data('ajaxGetContent', true);
 		}
 		
+		//binds popstate/hashchange event
+		if (!$('body').data('ajaxGetContent'))
+			bindUrlChangeEvent();
+		
 		//set the wasLoaded indicator to true after eventual popstate event is fired right after loading the page (Chrome&Safari)
 		//fire hashchange event for bookmark linking
 		$(window).load(function() {
+			wasLoaded = false;
 			setTimeout(function() {
 				wasLoaded = true;
 				
-				if (!usePushState && ($.param.fragment() != ''))
+				if (!$.fn.ajaxGetContent.usePushState && ($.param.fragment() != ''))
 					$(window).trigger('hashchange');
 			}, 1);
 		});
@@ -302,7 +307,7 @@
 					if (hrefNoAnchor.indexOf('#') >= 0)
 						hrefNoAnchor = hrefNoAnchor.substr(0, hrefNoAnchor.indexOf('#'));
 					
-					if (!usePushState)
+					if (!$.fn.ajaxGetContent.usePushState)
 					{
 						var baseUrl = options.baseUrl;
 						if (baseUrl != '')
@@ -320,14 +325,30 @@
 					$this.data('options', options);
 					$.fn.ajaxGetContent.lastClickedElement = $this;
 					
-					//wasClicked = true;
-					
-					if (usePushState)
+					if ($.fn.ajaxGetContent.usePushState)
 					{
 						history.pushState( {} , '', href + hrefParams);
 						$(window).trigger('popstate');
+						
+						//check if Android - bug in popstate
+						if ((href + hrefParams) != location.pathname)
+						{
+							//cancel popstate call
+							if ($.fn.ajaxGetContent.ajaxHandler)
+							{
+								$.fn.ajaxGetContent.ajaxHandler.abort();
+								$.fn.ajaxGetContent.ajaxHandler = null;
+							}
+							
+							$.fn.ajaxGetContent.usePushState = false;
+							//re-bind url change event
+							$(window).unbind('popstate');
+							bindUrlChangeEvent();
+						}
 					}
-					else jQuery.bbq.pushState(href + hrefParams, 2);
+					
+					if (!$.fn.ajaxGetContent.usePushState)
+						jQuery.bbq.pushState(href + hrefParams, 2);
 					
 					return false;
 				});
