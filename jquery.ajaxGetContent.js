@@ -29,6 +29,9 @@
 			//base url for url checking
 			baseUrl : '',
 			
+			//function indicating the page is ready
+			initFunction : $(window).load,
+			
 			//whether to use content cache
 			useCache : true,
 			
@@ -222,7 +225,7 @@
 		
 		//set the wasLoaded indicator to true after eventual popstate event is fired right after loading the page (Chrome&Safari)
 		//fire hashchange event for bookmark linking
-		$(window).load(function() {
+		options.initFunction(function() {
 			wasLoaded = false;
 			setTimeout(function() {
 				wasLoaded = true;
@@ -331,7 +334,7 @@
 						$(window).trigger('popstate');
 						
 						//check if Android - bug in popstate
-						if ((href + hrefParams) != location.pathname)
+						if (href != location.pathname)
 						{
 							//cancel popstate call
 							if ($.fn.ajaxGetContent.ajaxHandler)
