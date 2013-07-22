@@ -29,9 +29,6 @@
 			//base url for url checking
 			baseUrl : '',
 			
-			//function indicating the page is ready
-			initFunction : $(window).load,
-			
 			//whether to use content cache
 			useCache : true,
 			
@@ -225,13 +222,15 @@
 		
 		//set the wasLoaded indicator to true after eventual popstate event is fired right after loading the page (Chrome&Safari)
 		//fire hashchange event for bookmark linking
-		options.initFunction(function() {
+		$(window).load(function() {
 			wasLoaded = false;
 			setTimeout(function() {
 				wasLoaded = true;
 				
 				if (!$.fn.ajaxGetContent.usePushState && ($.param.fragment() != ''))
+				{
 					$(window).trigger('hashchange');
+				}
 			}, 1);
 		});
 
