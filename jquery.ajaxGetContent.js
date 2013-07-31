@@ -1,6 +1,6 @@
 /*	
 
- *	jQuery AjaxGetContent 1.3.1
+ *	jQuery AjaxGetContent 1.3.2
  *
  *
  *  Requires: jQuery BBQ, http://benalman.com/projects/jquery-bbq-plugin/
@@ -63,7 +63,12 @@
 		}, options);
 		
 		if (!$('body').data('ajaxGetContent'))
-			$.fn.ajaxGetContent.usePushState = Boolean(!options.forceBookmarkLinking && history.pushState);
+		{
+			//Android does not handle pushState properly
+			var isAndroid = navigator.userAgent.toLowerCase().indexOf("android") > -1
+			
+			$.fn.ajaxGetContent.usePushState = Boolean(!options.forceBookmarkLinking && history.pushState && !isAndroid);
+		}
 		
 		if (!$('body').data('ajaxGetContent'))
 			$.fn.ajaxGetContent.cache = new Array();
