@@ -1,6 +1,6 @@
 /*	
 
- *	jQuery AjaxGetContent 1.3.2
+ *	jQuery AjaxGetContent 1.3.3
  *
  *
  *  Requires: jQuery BBQ, http://benalman.com/projects/jquery-bbq-plugin/
@@ -93,6 +93,7 @@
 				}
 				
 				$.fn.ajaxGetContent.lastClickedUrl = url_status;
+				$.fn.ajaxGetContent.lastUrl = $.fn.ajaxGetContent.getCurrentUrl(true);
 				if (options.useCache && (url_status in $.fn.ajaxGetContent.cache))
 				{
 					options.onSend(url_status);
@@ -187,20 +188,28 @@
 		}
 
 		//gets current absolute url
-		$.fn.ajaxGetContent.getCurrentUrl = function()
+		$.fn.ajaxGetContent.getCurrentUrl = function(full)
 		{
+			var url = '';
 			if ($.fn.ajaxGetContent.usePushState)
 			{
-				var url = new String(location.href);
-				var startPos = url.indexOf('//');
-				startPos = startPos >=0 ? startPos+2 : 0;
-				url = url.substr(url.indexOf('/', startPos));
-				if (url.length == 0)
-					url = '/';
-				
-				return url;
+				url = new String(location.href);
+				if (!full)
+				{
+					var startPos = url.indexOf('//');
+					startPos = startPos >=0 ? startPos+2 : 0;
+					url = url.substr(url.indexOf('/', startPos));
+					if (url.length == 0)
+						url = '/';
+				}
 			}
-			else return $.param.fragment();
+			else url = $.param.fragment();
+			
+			//remove anchor
+			url = url.indexOf('#') == -1 ? url : url.substr(0, url.indexOf('#'));
+			
+			return url;
+			
 		}
 		
 		//clears cache
@@ -214,8 +223,24 @@
 		{
 			$(window).bind( $.fn.ajaxGetContent.usePushState ? 'popstate' : 'hashchange', function( event )
 			{
-				if (!($.fn.ajaxGetContent.usePushState && !wasLoaded))
-					sendReceive(true, $.fn.ajaxGetContent.usePushState ? location.href : event.fragment);
+				var url = null;
+				var block = false;
+				
+				//checking anchor
+				if ($.fn.ajaxGetContent.usePushState)
+				{
+					url = $.fn.ajaxGetContent.getCurrentUrl(true);//$.fn.ajaxGetContent.usePushState ? location.href : event.fragment;
+					var urlNoAnchor = url.indexOf('#') == -1 ? url : url.substr(0, url.indexOf('#'));
+					block = urlNoAnchor == $.fn.ajaxGetContent.lastUrl;
+				}
+				else
+				{
+					url = $.fn.ajaxGetContent.getCurrentUrl();
+					block = !options.onHrefCheck(url);
+				}
+				if (!block)
+					if (!($.fn.ajaxGetContent.usePushState && !wasLoaded))
+						sendReceive(true, url);
 			});
 			
 			$('body').data('ajaxGetContent', true);
@@ -236,6 +261,7 @@
 				{
 					$(window).trigger('hashchange');
 				}
+				$.fn.ajaxGetContent.lastUrl = $.fn.ajaxGetContent.getCurrentUrl(true);
 			}, 1);
 		});
 
