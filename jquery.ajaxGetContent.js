@@ -93,7 +93,8 @@
 				}
 				
 				$.fn.ajaxGetContent.lastClickedUrl = url_status;
-				$.fn.ajaxGetContent.lastUrl = $.fn.ajaxGetContent.getCurrentUrl(true);
+				$.fn.ajaxGetContent.lastUrl = $.fn.ajaxGetContent.getCurrentUrl();
+				$.fn.ajaxGetContent.lastFullUrl = $.fn.ajaxGetContent.getCurrentUrl(true);
 				if (options.useCache && (url_status in $.fn.ajaxGetContent.cache))
 				{
 					options.onSend(url_status);
@@ -229,14 +230,19 @@
 				//checking anchor
 				if ($.fn.ajaxGetContent.usePushState)
 				{
-					url = $.fn.ajaxGetContent.getCurrentUrl(true);//$.fn.ajaxGetContent.usePushState ? location.href : event.fragment;
-					var urlNoAnchor = url.indexOf('#') == -1 ? url : url.substr(0, url.indexOf('#'));
-					block = urlNoAnchor == $.fn.ajaxGetContent.lastUrl;
+					if ($.fn.ajaxGetContent.lastFullUrl)
+					{
+						url = $.fn.ajaxGetContent.getCurrentUrl(true);//$.fn.ajaxGetContent.usePushState ? location.href : event.fragment;
+						var urlNoAnchor = url.indexOf('#') == -1 ? url : url.substr(0, url.indexOf('#'));
+						block = (urlNoAnchor.substr(0) == $.fn.ajaxGetContent.lastFullUrl.substr(0));	//does not work without substr (?)
+					}
 				}
 				else
 				{
 					url = $.fn.ajaxGetContent.getCurrentUrl();
-					block = !options.onHrefCheck(url);
+					if (url.indexOf('?') >= 0)
+						url = url.substr(0, url.indexOf('?'));
+					block = !(url == '') && !options.onHrefCheck(url);
 				}
 				if (!block)
 					if (!($.fn.ajaxGetContent.usePushState && !wasLoaded))
@@ -261,7 +267,8 @@
 				{
 					$(window).trigger('hashchange');
 				}
-				$.fn.ajaxGetContent.lastUrl = $.fn.ajaxGetContent.getCurrentUrl(true);
+				$.fn.ajaxGetContent.lastUrl = $.fn.ajaxGetContent.getCurrentUrl();
+				$.fn.ajaxGetContent.lastFullUrl = $.fn.ajaxGetContent.getCurrentUrl(true);
 			}, 1);
 		});
 
@@ -297,7 +304,7 @@
 			
 			//validating url
 			var targetAttr = $this.attr('target');
-			var invalidUrl = 	/*(href.substr(0,1) != '/') || */(href.indexOf('#') >= 0) || (typeof targetAttr !== 'undefined' && targetAttr !== false); 
+			var invalidUrl = 	/*(href.substr(0,1) != '/') || */(href.indexOf('#') >= 0) || (typeof targetAttr !== 'undefined' && targetAttr !== false);
 								
 
 			//checking onUrlCheck callback
@@ -335,6 +342,9 @@
 					if (event && event.which && event.which != 1)
 						return true;
 					
+					if ($.fn.ajaxGetContent.lastUrl == (href + hrefParams))
+						return false;
+					
 					//check if url is a base url, if not - load baseUrl page with ajax link
 					var hrefNoAnchor = new String(window.location.href);
 					if (hrefNoAnchor.indexOf('#') >= 0)
@@ -364,7 +374,7 @@
 						$(window).trigger('popstate');
 						
 						//check if Android - bug in popstate
-						if (href != location.pathname)
+						/*if (href != location.pathname)
 						{
 							//cancel popstate call
 							if ($.fn.ajaxGetContent.ajaxHandler)
@@ -377,11 +387,9 @@
 							//re-bind url change event
 							$(window).unbind('popstate');
 							bindUrlChangeEvent();
-						}
+						}*/
 					}
-					
-					if (!$.fn.ajaxGetContent.usePushState)
-						jQuery.bbq.pushState(href + hrefParams, 2);
+					else jQuery.bbq.pushState(href + hrefParams, 2);
 					
 					return false;
 				});
