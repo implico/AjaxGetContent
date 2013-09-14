@@ -1,12 +1,14 @@
 /*	
 
  *	jQuery AjaxGetContent 1.3.3
+
+
  *
  *
- *  Requires: jQuery BBQ, http://benalman.com/projects/jquery-bbq-plugin/
+ *	Requires: jQuery BBQ, http://benalman.com/projects/jquery-bbq-plugin/
  *	
  *	More info at:
- *  www.implico.pl/lang-en/ajaxgetcontent_dynamic_ajax_website,7.html
+ *	www.implico.pl/lang-en/ajaxgetcontent-dynamic-ajax-website,7.html
  *	info@implico.pl
  *	
  *	Copyright (c) 2012 Implico Group
@@ -230,9 +232,9 @@
 				//checking anchor
 				if ($.fn.ajaxGetContent.usePushState)
 				{
+					url = $.fn.ajaxGetContent.getCurrentUrl(true);
 					if ($.fn.ajaxGetContent.lastFullUrl)
 					{
-						url = $.fn.ajaxGetContent.getCurrentUrl(true);//$.fn.ajaxGetContent.usePushState ? location.href : event.fragment;
 						var urlNoAnchor = url.indexOf('#') == -1 ? url : url.substr(0, url.indexOf('#'));
 						block = (urlNoAnchor.substr(0) == $.fn.ajaxGetContent.lastFullUrl.substr(0));	//does not work without substr (?)
 					}
@@ -335,7 +337,6 @@
 			
 			if (!alreadyEnabled && !invalidUrl && onHrefCheck && onElementCheck && !excludeAttr && !hasOnClick)
 			{
-				
 				$this .data('ajaxGetContent', true);
 				$this .click(function(event)
 				{
@@ -372,22 +373,6 @@
 					{
 						history.pushState( {} , '', href + hrefParams);
 						$(window).trigger('popstate');
-						
-						//check if Android - bug in popstate
-						/*if (href != location.pathname)
-						{
-							//cancel popstate call
-							if ($.fn.ajaxGetContent.ajaxHandler)
-							{
-								$.fn.ajaxGetContent.ajaxHandler.abort();
-								$.fn.ajaxGetContent.ajaxHandler = null;
-							}
-							
-							$.fn.ajaxGetContent.usePushState = false;
-							//re-bind url change event
-							$(window).unbind('popstate');
-							bindUrlChangeEvent();
-						}*/
 					}
 					else jQuery.bbq.pushState(href + hrefParams, 2);
 					
