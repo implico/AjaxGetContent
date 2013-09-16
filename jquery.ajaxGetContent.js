@@ -1,6 +1,6 @@
 /*	
 
- *	jQuery AjaxGetContent 1.4
+ *	jQuery AjaxGetContent 1.4.1
  *
  *
  *	Requires: jQuery BBQ, http://benalman.com/projects/jquery-bbq-plugin/
@@ -112,6 +112,7 @@
 				//adding get parameters
 				var paramString = new String();
 				var urlNoParams = url_status;
+				
 				if (url_status.indexOf('?') >= 0)
 				{
 					paramString = url_status.substr(url_status.indexOf('?') + 1);
@@ -249,9 +250,10 @@
 				else
 				{
 					url = $.fn.ajaxGetContent.getCurrentUrl();
-					if (url.indexOf('?') >= 0)
-						url = url.substr(0, url.indexOf('?'));
-					block = !(url == '') && !options.onHrefCheck(url);
+					urlCheck = url;
+					if (urlCheck.indexOf('?') >= 0)
+						urlCheck = urlCheck.substr(0, urlCheck.indexOf('?'));
+					block = !(urlCheck == '') && !options.onHrefCheck(urlCheck);
 				}
 				if (!block)
 					if (!($.fn.ajaxGetContent.usePushState && !wasLoaded))
@@ -345,6 +347,14 @@
 							//callback
 							if (formInfo.onSend && !formInfo.onSend.call(context))
 								return false;
+							
+							//adding submitting button
+							form.find('.submit-clicked-append').remove();
+							var submit = form.find('.submit-clicked');
+							if (!submit.length)
+								submit = form.find('input[type="submit"], button[type="submit"]').first();
+							if (submit.length)
+								form.append($('<input type="hidden" name="' + submit.attr('name') + '" value="' + submit.attr('value') + '" class="submit-clicked-append" style="display:none !important;" />'));
 						
 							//sending data
 							var callback = formInfo.onReceive ? formInfo.onReceive : function(){};
@@ -356,6 +366,13 @@
 					
 					var prevFunc = form.get(0).onsubmit;
 					
+					//activate submit buttons - adds a submit-clicked class to clicked button
+					form.find('input[type="submit"], button[type="submit"]').click(function()
+					{
+						$(this).parents('form').find('input[type="submit"], button[type="submit"]').removeClass('submit-clicked');
+						$(this).addClass('submit-clicked');
+					});
+							
 					form.submit(f(form.get(0), prevFunc, formInfo));
 					form.data('ajaxGetContent', true)
 				});

@@ -4,9 +4,9 @@
     "description": "Allows to transform classic website into a dynamic, ultrafast page, based on content loading using AJAX. All content remains visible for Google, the back/forward browser buttons are working, address bar changes. Automatic get/post forms handling, wide configuration options. See project home for demos.",
     "keywords": [
         "ajax",
-        "speed"
+        "load"
     ],
-    "version": "4.0.0",
+    "version": "4.0.1",
     "dependencies": {
         "jquery": ">=1.3"
     },
