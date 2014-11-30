@@ -1,6 +1,7 @@
 /*	
 
- *	jQuery AjaxGetContent 1.4.1
+ *	jQuery AjaxGetContent 1.4.5
+
  *
  *
  *	Requires: jQuery BBQ, http://benalman.com/projects/jquery-bbq-plugin/
@@ -43,8 +44,8 @@
 			
 			//invoked while target url checking
 			onHrefCheck : function(href, hrefParams) {
-				//avoid files
-				return (href.length > 0) && ((href.substr(href.length-1, 1) == '/') || (href.substr(href.length-5, 5) == '.html') || (href.substr(href.length-4, 4) == '.php')); 
+				//avoid physical path to files
+				return (href.length > 0) && ((href.indexOf('.') < 0) || (href.substr(href.length-5, 5) == '.html') || (href.substr(href.length-4, 4) == '.php')); 
 			},
 			
 			//invoked while A element checking
@@ -63,7 +64,7 @@
 			onSend : function(url) {},
 			
 			//invoked after receiving request
-			onReceive : function(data, status) {}
+			onReceive : function(data, status, isFromCache) {}
 			
 		}, options);
 		
@@ -87,7 +88,7 @@
 		//indicates whether the plugin is ready (in Chrome & Safari popstate is fired also when entering a website)
 		wasLoaded = true;//$('body').data('ajaxGetContent');
 		
-		var sendReceive = function (bool_data, url_status)
+		var sendReceive = function (bool_data, url_status, isFromCache)
 		{
 			if (typeof bool_data == 'boolean')
 			{
@@ -103,7 +104,7 @@
 				if (options.useCache && (url_status in $.fn.ajaxGetContent.cache))
 				{
 					options.onSend(url_status);
-					sendReceive($.fn.ajaxGetContent.cache[url_status], 'success');
+					sendReceive($.fn.ajaxGetContent.cache[url_status], 'success', true);
 					return;
 				}
 				
@@ -154,7 +155,7 @@
 				{
 				}
 				
-				options.onReceive(bool_data, url_status);
+				options.onReceive(bool_data, url_status, isFromCache == true);
 			}
 		}
 
@@ -183,18 +184,23 @@
 		}
 		
 		//auxillary function for scrolling content
-		$.fn.ajaxGetContent.scrollTo = function (id, always)
+		$.fn.ajaxGetContent.scrollTo = function (id, always, speed)
 		{
+			if (typeof speed == 'undefined')
+				speed = 500;
+			
 			var scrollPos = $('html').scrollTop();
 			if (!scrollPos)
 				scrollPos = $('body').scrollTop();
 			
-			if (always || (scrollPos > $(id).offset().top))
+			var isNumber = typeof id == 'number';
+			
+			if (always || (scrollPos > (isNumber ? id : $(id).offset().top)))
 			{
-				$('html,body').animate(
+				$('html,body').stop().animate(
 				{
-					scrollTop: $(id).offset().top
-				}, 500);
+					scrollTop: isNumber ? id : $(id).offset().top
+				}, speed);
 			}
 		}
 
@@ -289,6 +295,26 @@
 		});
 
 		
+		//get form action for bookmark linking
+		var formBookmarkGetAction = function(action) {
+			var loc = location.href;
+			
+			if (!action && !$.fn.ajaxGetContent.usePushState) {
+				var hashPos = loc.indexOf('#');
+				if (hashPos >= 0) {
+					loc = loc.substr(hashPos);
+					var questPos = loc.indexOf('?');
+					if (questPos >= 0)
+						loc = loc.substr(0, questPos);
+					
+					action = loc;
+				}
+			}
+			
+			return action;
+		}
+		
+		
 		//get forms - adding handlers
 		if (options.formsGet != null)
 			$.each(options.formsGet, function(formSelector, callback)
@@ -311,12 +337,15 @@
 							if (callback && !callback.call(context))
 								return false;
 							
-							$.fn.ajaxGetContent.load($(context).attr('action') + '?' + $(context).serialize());
+							$.fn.ajaxGetContent.lastClickedElement = $(context);
+							
+							$.fn.ajaxGetContent.load(formBookmarkGetAction($(context).attr('action')) + '?' + $(context).serialize());
 							return false;
 						}
 					}
 					
 					var prevFunc = form.get(0).onsubmit;
+					form.get(0).onsubmit = null;
 					
 					form.submit(f(this, prevFunc, callback));
 					form.data('ajaxGetContent', true)
@@ -338,6 +367,11 @@
 					{
 						return function()
 						{
+							//update CKEditor if loaded
+							if (typeof CKEDITOR !== 'undefined')
+								for (var instanceName in CKEDITOR.instances)
+								    CKEDITOR.instances[instanceName].updateElement();
+							
 							var form = $(context);
 							
 							//inline handler
@@ -350,27 +384,30 @@
 							
 							//adding submitting button
 							form.find('.submit-clicked-append').remove();
-							var submit = form.find('.submit-clicked');
+							var submit = form.find('.agc-submit-clicked');
 							if (!submit.length)
 								submit = form.find('input[type="submit"], button[type="submit"]').first();
 							if (submit.length)
 								form.append($('<input type="hidden" name="' + submit.attr('name') + '" value="' + submit.attr('value') + '" class="submit-clicked-append" style="display:none !important;" />'));
-						
+							
+							$.fn.ajaxGetContent.lastClickedElement = form;
+							
 							//sending data
 							var callback = formInfo.onReceive ? formInfo.onReceive : function(){};
-							$.ajax( { url: form.attr('action'), data: form.serializeArray(), type: 'POST', success: callback, error: callback, context: context } );
+							$.ajax( { url: formBookmarkGetAction(form.attr('action')), data: form.serializeArray(), type: 'POST', success: callback, error: callback, context: context } );
 							
 							return false;
 						}
 					}
 					
 					var prevFunc = form.get(0).onsubmit;
+					form.get(0).onsubmit = null;
 					
 					//activate submit buttons - adds a submit-clicked class to clicked button
 					form.find('input[type="submit"], button[type="submit"]').click(function()
 					{
-						$(this).parents('form').find('input[type="submit"], button[type="submit"]').removeClass('submit-clicked');
-						$(this).addClass('submit-clicked');
+						$(this).parents('form').find('input[type="submit"], button[type="submit"]').removeClass('agc-submit-clicked');
+						$(this).addClass('agc-submit-clicked');
 					});
 							
 					form.submit(f(form.get(0), prevFunc, formInfo));
@@ -449,15 +486,15 @@
 					if (event && event.which && event.which != 1)
 						return true;
 					
-					if ($.fn.ajaxGetContent.lastUrl == (href + hrefParams))
+					//block loading when the target address is same as current, unless the user clicks 2 times
+					/*if ($.fn.ajaxGetContent.lastUrl == (href + hrefParams))
 					{
-						//block loading when the target address is same as current, unless the user clicks 2 times
 						var cc = $this.data('ajaxGetContent_clickCount');
 						cc = cc ? (parseInt(cc) + 1) : 1;
 						$this.data('ajaxGetContent_clickCount', cc);
 						if (cc % 2 == 1)
 							return false;
-					}
+					}*/
 					
 					//check if url is a base url, if not - load baseUrl page with ajax link
 					var hrefNoAnchor = new String(window.location.href);
