@@ -1,28 +1,31 @@
-/*	
+/**
 
- *	jQuery AjaxGetContent 1.4.5
+ *	jQuery AjaxGetContent 1.6
 
  *
  *
  *	Requires: jQuery BBQ, http://benalman.com/projects/jquery-bbq-plugin/
- *	
- *	More info at:
- *	www.implico.pl/lang-en/ajaxgetcontent-dynamic-ajax-website,7.html
- *	info@implico.pl
  *	
  *	Copyright (c) 2012 Implico Group
  *	www.implico.pl
  *
  *	Licensed under the MIT license.
  *	http://en.wikipedia.org/wiki/MIT_License
+ *	
+ *	@author Bartosz Sak <info@implico.pl>
+ *
+ *	More info at:
+ *	@see http://www.implico.pl/en/ajaxgetcontent-dynamic-ajax-website,7
+ *	
  */
+
 
 (function( $ ) {
 
 	$.fn.ajaxGetContent = function( options ) {
 
 		
-		options = $.extend( {
+		options = $.extend( true, {
 			
 			//parameter set for requests
 			requestParameter : 'ajax_get_standard_content',
@@ -60,13 +63,153 @@
 			//post forms
 			formsPost : null,
 			
+			//preset effects
+			effect: {
+				type: null,			//possible: none, fade,
+				target: 'body',
+				timeoutBefore: 300,
+				timeoutAfter: 300,
+				callbackBeforePreAnimation: null,
+				callbackBeforePostAnimation: null,
+				callbackAfterPreAnimation: null,
+				callbackAfterPostAnimation: null,
+				loadScripts: true
+			},
+			
 			//invoked after sending request
-			onSend : function(url) {},
+			onSend : function(url) {
+				
+				if ($.fn.ajaxGetContent.lastClickedElement) {
+					$.fn.ajaxGetContent.scrollTo(0, true, options.effect.timeoutBefore);
+				}
+				
+				if ($.fn.ajaxGetContent.animationDeferred)
+				{
+					//cancel previous animation
+					$.fn.ajaxGetContent.animationDeferred.cancelled = true;
+					options.effect.target.stop('ajaxGetContent');
+				}
+				
+				if (options.effect.callbackBeforePreAnimation)
+					options.effect.callbackBeforePreAnimation();
+					
+				$.fn.ajaxGetContent.animationDeferred = new $.Deferred(function(d)
+				{
+				
+					d.cancelled = false;
+					var p1;
+					
+					if (options.effect.type == 'fade') {
+						p1 = options.effect.target.stop('ajaxGetContent').animate( {'opacity' : 0.2}, {
+							duration: options.effect.timeoutBefore,
+							queue: 'ajaxGetContent'
+						}).promise();
+						
+						options.effect.target.dequeue('ajaxGetContent');
+						
+					}
+					else p1 = new $.Deferred().resolve();
+					
+					//possible to add more Deferreds
+					
+					$.when(p1).then(function()
+					{
+						if (d.cancelled)
+							d.reject();
+						else { 
+							d.resolve();
+							if (options.effect.callbackBeforePostAnimation)
+								options.effect.callbackBeforePostAnimation();
+						}
+					});
+				});
+			},
 			
 			//invoked after receiving request
-			onReceive : function(data, status, isFromCache) {}
+			onReceive : function(data, status, isFromCache) {
+				
+				$.when($.fn.ajaxGetContent.animationDeferred).then(function()
+				{
+					data = (status == 'success' ? data : data.responseText);
+					
+					if (!data)
+						return;
+						
+					dataHead = data.replace(/\<\!doctype[.\s\S]*\<head\>[.\s\S]*\</im, '<').replace(/\<\/head\>.*/, '');
+					//console.log(dataHead);
+					
+					data = data.replace(/\<\!doctype[.\s\S]*\<\/head\>/im, '').replace(/\<\/html\>/im, '').replace(/\<body[^\>]*\>/im, '').replace(/\<\/body\>/im, '');
+					//data = data.replace(/\<\!doctype[.\s\S]*\<\/head\>/im, '').replace(/\<\/html\>/im, '').replace(/\<body[^\>]*\>/im, '<div class="main-wrap-ajax">').replace(/\<\/body\>/im, '</div>');
+					data = data;
+					
+		            data = $($.parseHTML(data, document, options.effect.loadScripts));
+		            
+		            var body = $('body');
+		            
+		            //save body attrs
+		            /*var attrs = body.get(0).attributes,
+		            	saveAttrs = [],
+		            	i;
+		            for (i = 0; i < attrs.length; i++) {
+		            	saveAttrs = { name: attrs[i].nodeName, value: attrs[i].nodeValue ? attrs[i].nodeValue : attrs[i].value }
+		            */
+		            
+		            body.data('ajaxGetContent', null);
+		            body.html(data);
+		            
+		            if (!options.effect.loadScripts)
+		            	$('a').ajaxGetContent(options);
+		            
+					//Google Analytics
+					if (window._gaq)
+						_gaq.push(['_trackPageview', $.fn.ajaxGetContent.getCurrentUrl()]);
+					
+					
+					if (options.effect.callbackAfterPreAnimation)
+						options.effect.callbackAfterPreAnimation();
+						
+					$.fn.ajaxGetContent.animationDeferred = new $.Deferred(function(d)
+					{
+						d.cancelled = false;
+						
+						
+						var p1;
+						
+						if (options.effect.type == 'fade') {
+							p1 = options.effect.target.stop('ajaxGetContent').animate( {'opacity' : 1}, {
+								duration: options.effect.timeoutAfter,
+								queue: 'ajaxGetContent'
+							}).promise();
+							
+							options.effect.target.dequeue('ajaxGetContent');
+							
+						}
+						else p1 = new $.Deferred().resolve();
+						//possible to add more Deferreds
+						
+						$.when(p1).then(function()
+						{
+							if (d.cancelled)
+								d.reject();
+							else d.resolve();
+						});
+					});
+					
+					$.fn.ajaxGetContent.animationDeferred.done(function()
+					{
+						$.fn.ajaxGetContent.animationDeferred = null;
+						
+						if (options.effect.callbackAfterPostAnimation)
+							options.effect.callbackAfterPostAnimation();
+					});
+					
+				});
+			}
 			
 		}, options);
+		
+		if (typeof options.effect.target != 'object')
+			options.effect.target = $(options.effect.target);
 		
 		if (!$('body').data('ajaxGetContent'))
 		{
@@ -84,6 +227,8 @@
 		$.fn.ajaxGetContent.lastClickedElement = null;
 		$.fn.ajaxGetContent.lastClickedUrl = null;
 		$.fn.ajaxGetContent.ajaxHandler = null;
+		$.fn.ajaxGetContent.history = $.fn.ajaxGetContent.history || [];
+		$.fn.ajaxGetContent.animationDeferred = $.fn.ajaxGetContent.animationDeferred || null;
 		
 		//indicates whether the plugin is ready (in Chrome & Safari popstate is fired also when entering a website)
 		wasLoaded = true;//$('body').data('ajaxGetContent');
@@ -114,7 +259,7 @@
 				var paramString = new String();
 				var urlNoParams = url_status;
 				
-				if (url_status.indexOf('?') >= 0)
+				/*if (url_status.indexOf('?') >= 0)
 				{
 					paramString = url_status.substr(url_status.indexOf('?') + 1);
 					urlNoParams = url_status.substr(0, url_status.indexOf('?'));
@@ -122,7 +267,7 @@
 				var params = $.deparam(paramString);
 				$.each(params, function(i, v){
 					data.push ({ name: i, value: v });
-				});
+				});*/
 
 				//adding forced parameters
 				var lastClickedElement = $.fn.ajaxGetContent.lastClickedElement;
@@ -137,8 +282,12 @@
 				
 				options.onSend(url_status);
 				
-				data.push ({ name: options.requestParameter, value:'on'});
+				if (options.requestParameter)
+					data.push ({ name: options.requestParameter, value: 'on'});
+				
 				$.fn.ajaxGetContent.ajaxHandler = $.ajax({ url: urlNoParams, data: data, type : 'GET', success : sendReceive, error : sendReceive, context : this });
+				
+				$.fn.ajaxGetContent.history.push(url_status);
 			}
 			else
 			{
@@ -261,6 +410,7 @@
 						urlCheck = urlCheck.substr(0, urlCheck.indexOf('?'));
 					block = !(urlCheck == '') && !options.onHrefCheck(urlCheck);
 				}
+				
 				if (!block)
 					if (!($.fn.ajaxGetContent.usePushState && !wasLoaded))
 						sendReceive(true, url);
@@ -339,7 +489,7 @@
 							
 							$.fn.ajaxGetContent.lastClickedElement = $(context);
 							
-							$.fn.ajaxGetContent.load(formBookmarkGetAction($(context).attr('action')) + '?' + $(context).serialize());
+							$.fn.ajaxGetContent.load(formBookmarkGetAction($(context).attr('action')) + '?' + $(context).serialize().replace('%5B%5D', '[]'));
 							return false;
 						}
 					}
@@ -478,10 +628,18 @@
 			
 			if (!alreadyEnabled && !invalidUrl && onHrefCheck && onElementCheck && !excludeAttr && !hasOnClick)
 			{
-				$this .data('ajaxGetContent', true);
-				$this .click(function(event)
+				$this.data('ajaxGetContent', true);
+				$this.click(function(event)
 				{
 					var $this = $(this);
+					
+					//checking onUrlCheck callback
+					if (!options.onHrefCheck(href, hrefParams))
+						return true;
+						
+					//checking onElementCheck callback
+					if (!options.onElementCheck($this))
+						return true;
 					
 					if (event && event.which && event.which != 1)
 						return true;
