@@ -67,6 +67,8 @@
 			effect: {
 				type: null,			//possible: none, fade,
 				target: 'body',
+				insertHead: false,
+				insertTitle: true,
 				timeoutBefore: 300,
 				timeoutAfter: 300,
 				callbackBeforePreAnimation: null,
@@ -134,9 +136,19 @@
 					
 					if (!data)
 						return;
-						
-					dataHead = data.replace(/\<\!doctype[.\s\S]*\<head\>[.\s\S]*\</im, '<').replace(/\<\/head\>.*/, '');
-					//console.log(dataHead);
+					
+					if (options.effect.insertHead || options.effect.insertTitle) {
+						dataHead = data.replace(/\<\!doctype[.\s\S]*\<head((\s[^\>]*\>)|(\>))/im, '').replace(/\<\/head\>[.\s\S]*/, '');
+						if (dataHead) {
+							if (options.effect.insertHead)
+								$('head').html(dataHead);
+							else {
+								var title = /\<title\>([^\<]*)/.exec(dataHead);
+								if (title[1])
+									$('head title').text(title[1]);
+							}
+						}
+					}
 					
 					data = data.replace(/\<\!doctype[.\s\S]*\<\/head\>/im, '').replace(/\<\/html\>/im, '').replace(/\<body[^\>]*\>/im, '').replace(/\<\/body\>/im, '');
 					//data = data.replace(/\<\!doctype[.\s\S]*\<\/head\>/im, '').replace(/\<\/html\>/im, '').replace(/\<body[^\>]*\>/im, '<div class="main-wrap-ajax">').replace(/\<\/body\>/im, '</div>');
