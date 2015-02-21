@@ -2,6 +2,7 @@
 
  *	jQuery AjaxGetContent 1.6
 
+
  *
  *
  *	Requires: jQuery BBQ, http://benalman.com/projects/jquery-bbq-plugin/
@@ -22,7 +23,7 @@
 
 (function( $ ) {
 
-	$.fn.ajaxGetContent = function( options ) {
+	$.fn.ajaxGetContent = function( initOptions ) {
 
 		
 		options = $.extend( true, {
@@ -218,7 +219,10 @@
 				});
 			}
 			
-		}, options);
+		}, initOptions);
+		
+		options.formsGet = initOptions.formsGet;
+		options.formsPost = initOptions.formsPost;
 		
 		if (typeof options.effect.target != 'object')
 			options.effect.target = $(options.effect.target);
