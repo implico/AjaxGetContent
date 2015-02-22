@@ -221,8 +221,11 @@
 			
 		}, initOptions);
 		
-		options.formsGet = initOptions.formsGet;
-		options.formsPost = initOptions.formsPost;
+		if (initOptions.formsGet || (initOptions.formsGet === null))
+			options.formsGet = initOptions.formsGet;
+		
+		if (initOptions.formsPost || (initOptions.formsPost === null))
+			options.formsPost = initOptions.formsPost;
 		
 		if (typeof options.effect.target != 'object')
 			options.effect.target = $(options.effect.target);
