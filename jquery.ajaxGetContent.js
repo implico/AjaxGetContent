@@ -55,7 +55,7 @@
 			//invoked while A element checking
 			onElementCheck : function(element) {
 				//avoid elements with no-ajax-load class
-				return !element.hasClass('no-ajax-load') && (element.attr('rel') != 'nofollow'); 
+				return !element.hasClass('no-ajax-load'); 
 			},
 			
 			//get forms
