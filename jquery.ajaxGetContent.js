@@ -49,7 +49,7 @@
 			//invoked while target url checking
 			onHrefCheck : function(href, hrefParams) {
 				//avoid physical path to files
-				return (href.length > 0) && ((href.indexOf('.') < 0) || (href.substr(href.length-5, 5) == '.html') || (href.substr(href.length-4, 4) == '.php')); 
+				return ((href.length > 0) || (hrefParams.length > 0)) && ((href.indexOf('.') < 0) || (href.substr(href.length-5, 5) == '.html') || (href.substr(href.length-4, 4) == '.php')); 
 			},
 			
 			//invoked while A element checking
@@ -608,7 +608,7 @@
 				hrefParams = href.substr(href.indexOf('?'));
 				href = href.substr(0, href.indexOf('?'));
 			}
-
+			
 			
 			/*
 			 *  checking conditions
