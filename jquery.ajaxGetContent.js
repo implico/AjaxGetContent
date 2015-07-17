@@ -651,6 +651,7 @@
 				$this.click(function(event)
 				{
 					var $this = $(this);
+					href = $(this).attr('href');
 					
 					//checking onUrlCheck callback
 					if (!options.onHrefCheck(href, hrefParams))
