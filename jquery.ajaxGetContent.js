@@ -652,6 +652,11 @@
 				{
 					var $this = $(this);
 					href = $(this).attr('href');
+					if (href.indexOf('?') >= 0)
+					{
+						hrefParams = href.substr(href.indexOf('?'));
+						href = href.substr(0, href.indexOf('?'));
+					}
 					
 					//checking onUrlCheck callback
 					if (!options.onHrefCheck(href, hrefParams))
