@@ -35,7 +35,7 @@
 			baseUrl : '',
 			
 			//whether to use content cache
-			useCache : true,
+			useCache : false,
 			
 			//force bookmark linking
 			forceBookmarkLinking : false,
@@ -265,6 +265,9 @@
 				$.fn.ajaxGetContent.lastClickedUrl = url_status;
 				$.fn.ajaxGetContent.lastUrl = $.fn.ajaxGetContent.getCurrentUrl();
 				$.fn.ajaxGetContent.lastFullUrl = $.fn.ajaxGetContent.getCurrentUrl(true);
+				
+				$.fn.ajaxGetContent.history.push(url_status);
+				
 				if (options.useCache && (url_status in $.fn.ajaxGetContent.cache))
 				{
 					options.onSend(url_status);
@@ -305,8 +308,6 @@
 					data.push ({ name: options.requestParameter, value: 'on'});
 				
 				$.fn.ajaxGetContent.ajaxHandler = $.ajax({ url: urlNoParams, data: data, type : 'GET', success : sendReceive, error : sendReceive, context : this });
-				
-				$.fn.ajaxGetContent.history.push(url_status);
 			}
 			else
 			{
