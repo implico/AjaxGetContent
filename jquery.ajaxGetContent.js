@@ -1,6 +1,6 @@
 /**
 
- *	jQuery AjaxGetContent 1.6
+ *	jQuery AjaxGetContent 1.7
 
 
  *
@@ -49,7 +49,7 @@
 			//invoked while target url checking
 			onHrefCheck : function(href, hrefParams) {
 				//avoid physical path to files
-				return ((href.length > 0) || (hrefParams.length > 0)) && ((href.indexOf('.') < 0) || (href.substr(href.length-5, 5) == '.html') || (href.substr(href.length-4, 4) == '.php')); 
+				return ((href.length > 0) || (hrefParams.length > 0)) && ((href == '.') || (href.indexOf('.') < 0) || (href.substr(href.length-5, 5) == '.html') || (href.substr(href.length-4, 4) == '.php')); 
 			},
 			
 			//invoked while A element checking
@@ -151,27 +151,46 @@
 						}
 					}
 					
-					data = data.replace(/\<\!doctype[.\s\S]*\<\/head\>/im, '').replace(/\<\/html\>/im, '').replace(/\<body[^\>]*\>/im, '').replace(/\<\/body\>/im, '');
+					data = data.replace(/\<\!doctype[.\s\S]*\<\/head\>/im, '').replace(/\<\/html\>/im, '');
+
+
+					//get body class
+					$body = $($.parseHTML(data.replace('<body', '<bodyReplaced').replace('</body>', '</bodyReplaced>')));
+					var bodyAttrs = [];
+					$body.each(function() {
+						var $this = $(this),
+								tagName = $this.prop('tagName');
+
+						if (tagName && tagName.toLowerCase() == 'bodyreplaced') {
+							bodyAttrs = $this[0].attributes;
+							return false;
+						}
+					});
+
+					data = data.replace(/\<body[^\>]*\>/im, '').replace(/\<\/body\>/im, '');
+
 					//data = data.replace(/\<\!doctype[.\s\S]*\<\/head\>/im, '').replace(/\<\/html\>/im, '').replace(/\<body[^\>]*\>/im, '<div class="main-wrap-ajax">').replace(/\<\/body\>/im, '</div>');
-					data = data;
 					
-		            data = $($.parseHTML(data, document, options.effect.loadScripts));
-		            
-		            var body = $('body');
-		            
-		            //save body attrs
-		            /*var attrs = body.get(0).attributes,
-		            	saveAttrs = [],
-		            	i;
-		            for (i = 0; i < attrs.length; i++) {
-		            	saveAttrs = { name: attrs[i].nodeName, value: attrs[i].nodeValue ? attrs[i].nodeValue : attrs[i].value }
-		            */
-		            
-		            body.data('ajaxGetContent', null);
-		            body.html(data);
-		            
-		            if (!options.effect.loadScripts)
-		            	$('a').ajaxGetContent(options);
+          data = $($.parseHTML(data, document, options.effect.loadScripts));
+          
+          var body = $('body');
+          
+          //save body attrs
+          /*var attrs = body.get(0).attributes,
+          	saveAttrs = [],
+          	i;
+          for (i = 0; i < attrs.length; i++) {
+          	saveAttrs = { name: attrs[i].nodeName, value: attrs[i].nodeValue ? attrs[i].nodeValue : attrs[i].value }
+          */
+          
+          body.data('ajaxGetContent', null);
+          body.html(data);
+          $.each(bodyAttrs, function() {
+          	body.attr(this.nodeName, this.nodeValue);
+          });
+          
+          if (!options.effect.loadScripts)
+          	$('a').ajaxGetContent(options);
 		            
 					//Google Analytics
 					if (window._gaq)
@@ -232,10 +251,12 @@
 		
 		if (!$('body').data('ajaxGetContent'))
 		{
-			//Android does not handle pushState properly
-			var isAndroid = navigator.userAgent.toLowerCase().indexOf("android") > -1
+			//Android < 4.3 does not handle pushState properly
+			var ua = navigator.userAgent.toLowerCase(),
+    			match = ua.match(/android\s([0-9\.]*)/),
+    			isOldAndroid = match && (parseFloat(match[1]) < 4.3);
 			
-			$.fn.ajaxGetContent.usePushState = Boolean(!options.forceBookmarkLinking && history.pushState && !isAndroid);
+			$.fn.ajaxGetContent.usePushState = Boolean(!options.forceBookmarkLinking && history.pushState && !isOldAndroid);
 		}
 		
 		if (!$('body').data('ajaxGetContent'))
@@ -244,6 +265,7 @@
 		var mainElement = this;
 		
 		$.fn.ajaxGetContent.lastClickedElement = null;
+		$.fn.ajaxGetContent.lastChangeUrlElement = null;	//last clicked element removed on url change by history nav
 		$.fn.ajaxGetContent.lastClickedUrl = null;
 		$.fn.ajaxGetContent.ajaxHandler = null;
 		$.fn.ajaxGetContent.history = $.fn.ajaxGetContent.history || [];
@@ -353,7 +375,7 @@
 		}
 		
 		//auxillary function for scrolling content
-		$.fn.ajaxGetContent.scrollTo = function (id, always, speed)
+		$.fn.ajaxGetContent.scrollTo = function (id, always, speed, ratio)
 		{
 			if (typeof speed == 'undefined')
 				speed = 500;
@@ -364,12 +386,22 @@
 			
 			var isNumber = typeof id == 'number';
 			
-			if (always || (scrollPos > (isNumber ? id : $(id).offset().top)))
-			{
-				$('html,body').stop().animate(
-				{
-					scrollTop: isNumber ? id : $(id).offset().top
-				}, speed);
+			if (always || (scrollPos > (isNumber ? id : $(id).offset().top))) {
+				var offset = isNumber ? id : $(id).offset().top;
+				if (ratio) {
+					offset = ratio % 1 === 0 ? (offset - ratio) : Math.max(0, parseInt(offset - ratio * $(window).height()));
+				}
+				$('html,body').stop().animate({
+					scrollTop: offset
+				}, speed, function() {
+					$(window).off('mousewheel.ajaxGetContentScrollTo DOMMouseScroll.ajaxGetContentScrollTo');
+				});
+
+				//cancel on mousewheel
+				$(window).on('mousewheel.ajaxGetContentScrollTo DOMMouseScroll.ajaxGetContentScrollTo', function() {
+					$('html,body').stop(true);
+					$(window).off('mousewheel.ajaxGetContentScrollTo DOMMouseScroll.ajaxGetContentScrollTo');
+				});
 			}
 		}
 
@@ -417,9 +449,10 @@
 				if ($.fn.ajaxGetContent.usePushState)
 				{
 					url = $.fn.ajaxGetContent.getCurrentUrl(true, true);
-					if ($.fn.ajaxGetContent.lastFullUrl && (url.indexOf('#') >= 0))
+					if ($.fn.ajaxGetContent.lastFullUrl)// && (url.indexOf('#') >= 0))
 					{
-						block = ($.fn.ajaxGetContent.getCurrentUrl(true) == $.fn.ajaxGetContent.lastFullUrl);	//does not work without substr (?)
+						block = ($.fn.ajaxGetContent.getCurrentUrl(true).substr(0) == $.fn.ajaxGetContent.lastFullUrl.substr(0))
+										&& (!$.fn.ajaxGetContent.lastChangeUrlElement || (url.indexOf('#') >= 0));//((url.indexOf('#') >= 0) || ($.fn.ajaxGetContent.getCurrentUrl(false) == ''));
 					}
 				}
 				else
@@ -428,7 +461,7 @@
 					urlCheck = url;
 					if (urlCheck.indexOf('?') >= 0)
 						urlCheck = urlCheck.substr(0, urlCheck.indexOf('?'));
-					block = !(urlCheck == '') && !options.onHrefCheck(urlCheck);
+					block = (urlCheck != '') && !options.onHrefCheck(urlCheck);
 				}
 				
 				if (!block)
@@ -437,6 +470,7 @@
 			});
 			
 			$('body').data('ajaxGetContent', true);
+			$.fn.ajaxGetContent.lastChangeUrlElement = null;
 		}
 		
 		//binds popstate/hashchange event
@@ -560,7 +594,7 @@
 							if (submit.length)
 								form.append($('<input type="hidden" name="' + submit.attr('name') + '" value="' + submit.attr('value') + '" class="submit-clicked-append" style="display:none !important;" />'));
 							
-							$.fn.ajaxGetContent.lastClickedElement = form;
+							$.fn.ajaxGetContent.lastClickedElement = $.fn.ajaxGetContent.lastChangeUrlElement = form;
 							
 							//sending data
 							var callback = formInfo.onReceive ? formInfo.onReceive : function(){};
@@ -699,7 +733,7 @@
 					}
 					
 					$this.data('options', options);
-					$.fn.ajaxGetContent.lastClickedElement = $this;
+					$.fn.ajaxGetContent.lastClickedElement = $.fn.ajaxGetContent.lastChangeUrlElement = $this;
 			
 					$.fn.ajaxGetContent.load(href + hrefParams);
 					
