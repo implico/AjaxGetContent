@@ -1,13 +1,11 @@
 /**
 
- *	jQuery AjaxGetContent 1.7
+ *	jQuery AjaxGetContent 1.8.0
 
 
  *
  *
- *	Requires: jQuery BBQ, http://benalman.com/projects/jquery-bbq-plugin/
- *	
- *	Copyright (c) 2012 Implico Group
+ *	Copyright (c) 2016 Bartosz Sak
  *	www.implico.pl
  *
  *	Licensed under the MIT license.
@@ -21,7 +19,7 @@
  */
 
 
-(function( $ ) {
+(function($) {
 
 	$.fn.ajaxGetContent = function( initOptions ) {
 
@@ -36,9 +34,6 @@
 			
 			//whether to use content cache
 			useCache : false,
-			
-			//force bookmark linking
-			forceBookmarkLinking : false,
 			
 			//forced get params
 			params : {},
@@ -175,14 +170,6 @@
           
           var body = $('body');
           
-          //save body attrs
-          /*var attrs = body.get(0).attributes,
-          	saveAttrs = [],
-          	i;
-          for (i = 0; i < attrs.length; i++) {
-          	saveAttrs = { name: attrs[i].nodeName, value: attrs[i].nodeValue ? attrs[i].nodeValue : attrs[i].value }
-          */
-          
           body.data('ajaxGetContent', null);
           body.html(data);
           $.each(bodyAttrs, function() {
@@ -239,6 +226,21 @@
 			}
 			
 		}, initOptions);
+
+		var $w = $(window),
+				$d = $(document),
+				wasInitialized = $('body').data('ajaxGetContent');
+
+
+		var isOldAndroid = false;		
+		if (!wasInitialized)
+		{
+			//Android < 4.3 does not handle pushState properly
+			var ua = navigator.userAgent.toLowerCase(),
+    			match = ua.match(/android\s([0-9\.]*)/);
+
+    	isOldAndroid = match && (parseFloat(match[1]) < 4.3);
+		}
 		
 		if (initOptions.formsGet || (initOptions.formsGet === null))
 			options.formsGet = initOptions.formsGet;
@@ -249,30 +251,23 @@
 		if (typeof options.effect.target != 'object')
 			options.effect.target = $(options.effect.target);
 		
-		if (!$('body').data('ajaxGetContent'))
-		{
-			//Android < 4.3 does not handle pushState properly
-			var ua = navigator.userAgent.toLowerCase(),
-    			match = ua.match(/android\s([0-9\.]*)/),
-    			isOldAndroid = match && (parseFloat(match[1]) < 4.3);
-			
-			$.fn.ajaxGetContent.usePushState = Boolean(!options.forceBookmarkLinking && history.pushState && !isOldAndroid);
+		$.fn.ajaxGetContent.lastClickedElement = null;
+		
+		if (!wasInitialized) {
+			$.fn.ajaxGetContent.cache = new Array();
+			$.fn.ajaxGetContent.lastChangeUrlElement = null;	//last clicked element, removed on url change by history nav
+			$.fn.ajaxGetContent.lastLoadedUrl = null;
+
+			$.fn.ajaxGetContent.prevUrl = null;
+			$.fn.ajaxGetContent.prevFullUrl = null;
+
+			$.fn.ajaxGetContent.ajaxHandler = null;
+			$.fn.ajaxGetContent.history = [location.href];
+			$.fn.ajaxGetContent.animationDeferred = null;
 		}
 		
-		if (!$('body').data('ajaxGetContent'))
-			$.fn.ajaxGetContent.cache = new Array();
-		
-		var mainElement = this;
-		
-		$.fn.ajaxGetContent.lastClickedElement = null;
-		$.fn.ajaxGetContent.lastChangeUrlElement = null;	//last clicked element removed on url change by history nav
-		$.fn.ajaxGetContent.lastClickedUrl = null;
-		$.fn.ajaxGetContent.ajaxHandler = null;
-		$.fn.ajaxGetContent.history = $.fn.ajaxGetContent.history || [];
-		$.fn.ajaxGetContent.animationDeferred = $.fn.ajaxGetContent.animationDeferred || null;
-		
 		//indicates whether the plugin is ready (in Chrome & Safari popstate is fired also when entering a website)
-		wasLoaded = true;//$('body').data('ajaxGetContent');
+		wasLoaded = true;
 		
 		var sendReceive = function (bool_data, url_status, isFromCache)
 		{
@@ -284,9 +279,9 @@
 					$.fn.ajaxGetContent.ajaxHandler = null;
 				}
 				
-				$.fn.ajaxGetContent.lastClickedUrl = url_status;
-				$.fn.ajaxGetContent.lastUrl = $.fn.ajaxGetContent.getCurrentUrl();
-				$.fn.ajaxGetContent.lastFullUrl = $.fn.ajaxGetContent.getCurrentUrl(true);
+				$.fn.ajaxGetContent.lastLoadedUrl = url_status;
+				$.fn.ajaxGetContent.prevUrl = $.fn.ajaxGetContent.getCurrentUrl();
+				$.fn.ajaxGetContent.prevFullUrl = $.fn.ajaxGetContent.getCurrentUrl(true);
 				
 				$.fn.ajaxGetContent.history.push(url_status);
 				
@@ -337,9 +332,9 @@
 				
 				if (url_status == 'success')
 				{
-					if (options.useCache && $.fn.ajaxGetContent.lastClickedUrl)
+					if (options.useCache && $.fn.ajaxGetContent.lastLoadedUrl)
 					{
-						$.fn.ajaxGetContent.cache[$.fn.ajaxGetContent.lastClickedUrl] = bool_data;
+						$.fn.ajaxGetContent.cache[$.fn.ajaxGetContent.lastLoadedUrl] = bool_data;
 					}
 				}
 				else
@@ -353,30 +348,17 @@
 		//loads specified url or reloads page (for url = null)
 		$.fn.ajaxGetContent.load = function(url)
 		{
-			
-			if ($.fn.ajaxGetContent.usePushState)
-			{
-				if (url == null)
-					url = location.href;
-				
-				history.pushState( {} , '', url);
-				$(window).trigger('popstate');
-			}
-			else
-			{
-				if (url == null)
-					url = $.param.fragment();
-				
-				if ($.param.fragment() != url)
-					jQuery.bbq.pushState(url, 2);
-				else sendReceive(true, url);
-			}
-			
+			if (url == null)
+				url = location.href;
+
+			history.pushState( {} , '', url);
+			$w.trigger('popstate.ajaxGetContent', [true]);
 		}
 		
 		//auxillary function for scrolling content
-		$.fn.ajaxGetContent.scrollTo = function (id, always, speed, ratio)
+		$.fn.ajaxGetContent.scrollTo = function (id, always, speed, ratio, cb)
 		{
+			var cancelEvents = 'wheel.agc DOMMouseScroll.agc mousewheel.agc keyup.agc touchmove.agc';
 			if (typeof speed == 'undefined')
 				speed = 500;
 			
@@ -387,21 +369,29 @@
 			var isNumber = typeof id == 'number';
 			
 			if (always || (scrollPos > (isNumber ? id : $(id).offset().top))) {
-				var offset = isNumber ? id : $(id).offset().top;
+				var offset = isNumber ? id : ($(id).length ? $(id).offset().top : $(window).scrollTop());
 				if (ratio) {
-					offset = ratio % 1 === 0 ? (offset - ratio) : Math.max(0, parseInt(offset - ratio * $(window).height()));
+					offset = ratio % 1 === 0 ? (offset - ratio) : Math.max(0, parseInt(offset - ratio * $w.height()));
 				}
-				$('html,body').stop().animate({
+				$('html,body').stop(true).animate({
 					scrollTop: offset
 				}, speed, function() {
-					$(window).off('mousewheel.ajaxGetContentScrollTo DOMMouseScroll.ajaxGetContentScrollTo');
+					$w.off(cancelEvents);
+					if (cb)
+						cb();
 				});
 
 				//cancel on mousewheel
-				$(window).on('mousewheel.ajaxGetContentScrollTo DOMMouseScroll.ajaxGetContentScrollTo', function() {
+				$w.on(cancelEvents, function() {
 					$('html,body').stop(true);
-					$(window).off('mousewheel.ajaxGetContentScrollTo DOMMouseScroll.ajaxGetContentScrollTo');
+					$w.off(cancelEvents);
+					if (cb)
+						cb();
 				});
+			}
+			else {
+				if (cb)
+					cb();
 			}
 		}
 
@@ -409,19 +399,15 @@
 		$.fn.ajaxGetContent.getCurrentUrl = function(full, leaveAnchor)
 		{
 			var url = '';
-			if ($.fn.ajaxGetContent.usePushState)
+			url = new String(location.href);
+			if (!full)
 			{
-				url = new String(location.href);
-				if (!full)
-				{
-					var startPos = url.indexOf('//');
-					startPos = startPos >=0 ? startPos+2 : 0;
-					url = url.substr(url.indexOf('/', startPos));
-					if (url.length == 0)
-						url = '/';
-				}
+				var startPos = url.indexOf('//');
+				startPos = startPos >=0 ? startPos+2 : 0;
+				url = url.substr(url.indexOf('/', startPos));
+				if (url.length == 0)
+					url = '/';
 			}
-			else url = $.param.fragment();
 			
 			//remove anchor
 			if (!leaveAnchor)
@@ -436,88 +422,50 @@
 		{
 			$.fn.ajaxGetContent.cache = new Array();
 		}
+
+  	if (!history.pushState || isOldAndroid) {
+  		return this;	//no support
+  	}
 		
-		//binds url change event
-		var bindUrlChangeEvent = function()
-		{
-			$(window).bind( $.fn.ajaxGetContent.usePushState ? 'popstate' : 'hashchange', function( event )
+		//binds popstate event
+		if (!$('body').data('ajaxGetContent')) {
+			$w.on('popstate.ajaxGetContent', function(event, force)
 			{
 				var url = null;
 				var block = false;
 				
 				//checking anchor
-				if ($.fn.ajaxGetContent.usePushState)
+				url = $.fn.ajaxGetContent.getCurrentUrl(true, true);
+				if (!force && $.fn.ajaxGetContent.prevFullUrl)// && (url.indexOf('#') >= 0))
 				{
-					url = $.fn.ajaxGetContent.getCurrentUrl(true, true);
-					if ($.fn.ajaxGetContent.lastFullUrl)// && (url.indexOf('#') >= 0))
-					{
-						block = ($.fn.ajaxGetContent.getCurrentUrl(true).substr(0) == $.fn.ajaxGetContent.lastFullUrl.substr(0))
-										&& (!$.fn.ajaxGetContent.lastChangeUrlElement || (url.indexOf('#') >= 0));//((url.indexOf('#') >= 0) || ($.fn.ajaxGetContent.getCurrentUrl(false) == ''));
-					}
-				}
-				else
-				{
-					url = $.fn.ajaxGetContent.getCurrentUrl();
-					urlCheck = url;
-					if (urlCheck.indexOf('?') >= 0)
-						urlCheck = urlCheck.substr(0, urlCheck.indexOf('?'));
-					block = (urlCheck != '') && !options.onHrefCheck(urlCheck);
+					block = ($.fn.ajaxGetContent.getCurrentUrl(true).substr(0) == $.fn.ajaxGetContent.prevFullUrl.substr(0))
+									&& (!$.fn.ajaxGetContent.lastChangeUrlElement || (url.charAt(0) == '#'));//((url.indexOf('#') >= 0) || ($.fn.ajaxGetContent.getCurrentUrl(false) == ''));
 				}
 				
-				if (!block)
-					if (!($.fn.ajaxGetContent.usePushState && !wasLoaded))
-						sendReceive(true, url);
+				if (!block && wasLoaded)
+					sendReceive(true, url);
+
+				$.fn.ajaxGetContent.lastChangeUrlElement = null;
 			});
 			
 			$('body').data('ajaxGetContent', true);
-			$.fn.ajaxGetContent.lastChangeUrlElement = null;
 		}
 		
-		//binds popstate/hashchange event
-		if (!$('body').data('ajaxGetContent'))
-			bindUrlChangeEvent();
-		
 		//set the wasLoaded indicator to true after eventual popstate event is fired right after loading the page (Chrome&Safari)
-		//fire hashchange event for bookmark linking
-		$(window).load(function() {
+		$w.load(function() {
 			wasLoaded = false;
 			setTimeout(function() {
 				wasLoaded = true;
 				
-				if (!$.fn.ajaxGetContent.usePushState && ($.param.fragment() != ''))
-				{
-					$(window).trigger('hashchange');
-				}
-				
 				//set last urls if not clicked before window load
-				if (!$.fn.ajaxGetContent.lastUrl)
+				if (!$.fn.ajaxGetContent.prevUrl)
 				{
-					$.fn.ajaxGetContent.lastUrl = $.fn.ajaxGetContent.getCurrentUrl();
-					$.fn.ajaxGetContent.lastFullUrl = $.fn.ajaxGetContent.getCurrentUrl(true);
+					$.fn.ajaxGetContent.prevUrl = $.fn.ajaxGetContent.getCurrentUrl();
+					$.fn.ajaxGetContent.prevFullUrl = $.fn.ajaxGetContent.getCurrentUrl(true);
 				}
 			}, 1);
 		});
 
-		
-		//get form action for bookmark linking
-		var formBookmarkGetAction = function(action) {
-			var loc = location.href;
-			
-			if (!action && !$.fn.ajaxGetContent.usePushState) {
-				var hashPos = loc.indexOf('#');
-				if (hashPos >= 0) {
-					loc = loc.substr(hashPos);
-					var questPos = loc.indexOf('?');
-					if (questPos >= 0)
-						loc = loc.substr(0, questPos);
-					
-					action = loc;
-				}
-			}
-			
-			return action;
-		}
-		
 		
 		//get forms - adding handlers
 		if (options.formsGet != null)
@@ -541,9 +489,9 @@
 							if (callback && !callback.call(context))
 								return false;
 							
-							$.fn.ajaxGetContent.lastClickedElement = $(context);
+							$.fn.ajaxGetContent.lastClickedElement = $.fn.ajaxGetContent.lastChangeUrlElement = $(context);
 							
-							$.fn.ajaxGetContent.load(formBookmarkGetAction($(context).attr('action')) + '?' + $(context).serialize().replace('%5B%5D', '[]'));
+							$.fn.ajaxGetContent.load($(context).attr('action') + '?' + $(context).serialize().replace('%5B%5D', '[]'));
 							return false;
 						}
 					}
@@ -598,7 +546,7 @@
 							
 							//sending data
 							var callback = formInfo.onReceive ? formInfo.onReceive : function(){};
-							$.ajax( { url: formBookmarkGetAction(form.attr('action')), data: form.serializeArray(), type: 'POST', success: callback, error: callback, context: context } );
+							$.ajax( { url: form.attr('action'), data: form.serializeArray(), type: 'POST', success: callback, error: callback, context: context } );
 							
 							return false;
 						}
@@ -651,7 +599,7 @@
 			
 			//validating url
 			var targetAttr = $this.attr('target');
-			var invalidUrl = 	/*(href.substr(0,1) != '/') || */(href.indexOf('#') >= 0) || (typeof targetAttr !== 'undefined' && targetAttr !== false);
+			var invalidUrl = 	/*(href.substr(0,1) != '/') || */(href.charAt(0) == '#') || (typeof targetAttr !== 'undefined' && targetAttr !== false);
 								
 
 			//checking onUrlCheck callback
@@ -704,33 +652,10 @@
 					if (event && event.which && event.which != 1)
 						return true;
 					
-					//block loading when the target address is same as current, unless the user clicks 2 times
-					/*if ($.fn.ajaxGetContent.lastUrl == (href + hrefParams))
-					{
-						var cc = $this.data('ajaxGetContent_clickCount');
-						cc = cc ? (parseInt(cc) + 1) : 1;
-						$this.data('ajaxGetContent_clickCount', cc);
-						if (cc % 2 == 1)
-							return false;
-					}*/
-					
 					//check if url is a base url, if not - load baseUrl page with ajax link
 					var hrefNoAnchor = new String(window.location.href);
 					if (hrefNoAnchor.indexOf('#') >= 0)
 						hrefNoAnchor = hrefNoAnchor.substr(0, hrefNoAnchor.indexOf('#'));
-					
-					if (!$.fn.ajaxGetContent.usePushState)
-					{
-						var baseUrl = options.baseUrl;
-						if (baseUrl != '')
-						{
-							if (hrefNoAnchor != baseUrl)
-							{
-								location.href = baseUrl + '#' + href + hrefParams;
-								return false;
-							}
-						}
-					}
 					
 					$this.data('options', options);
 					$.fn.ajaxGetContent.lastClickedElement = $.fn.ajaxGetContent.lastChangeUrlElement = $this;
@@ -744,16 +669,4 @@
 	
 	};
 
-
-})( jQuery );
-
-
-/*
- * jQuery BBQ: Back Button & Query Library - v1.2.1 - 2/17/2010
- * http://benalman.com/projects/jquery-bbq-plugin/
- * 
- * Copyright (c) 2010 "Cowboy" Ben Alman
- * Dual licensed under the MIT and GPL licenses.
- * http://benalman.com/about/license/
- */
-(function(e,t){"$:nomunge";function N(e){return typeof e==="string"}function C(e){var t=r.call(arguments,1);return function(){return e.apply(this,t.concat(r.call(arguments)))}}function k(e){return e.replace(/^[^#]*#?(.*)$/,"$1")}function L(e){return e.replace(/(?:^[^?#]*\?([^#]*).*$)?.*/,"$1")}function A(r,o,a,f,l){var c,h,p,d,g;if(f!==n){p=a.match(r?/^([^#]*)\#?(.*)$/:/^([^#?]*)\??([^#]*)(#?.*)/);g=p[3]||"";if(l===2&&N(f)){h=f.replace(r?S:E,"")}else{d=u(p[2]);f=N(f)?u[r?m:v](f):f;h=l===2?f:l===1?e.extend({},f,d):e.extend({},d,f);h=s(h);if(r){h=h.replace(x,i)}}c=p[1]+(r?"#":h||!p[1]?"?":"")+h+g}else{c=o(a!==n?a:t[y][b])}return c}function O(e,t,r){if(t===n||typeof t==="boolean"){r=t;t=s[e?m:v]()}else{t=N(t)?t.replace(e?S:E,""):t}return u(t,r)}function M(t,r,i,o){if(!N(i)&&typeof i!=="object"){o=i;i=r;r=n}return this.each(function(){var n=e(this),u=r||h()[(this.nodeName||"").toLowerCase()]||"",a=u&&n.attr(u)||"";n.attr(u,s[t](a,i,o))})}var n,r=Array.prototype.slice,i=decodeURIComponent,s=e.param,o,u,a,f=e.bbq=e.bbq||{},l,c,h,p=e.event.special,d="hashchange",v="querystring",m="fragment",g="elemUrlAttr",y="location",b="href",w="src",E=/^.*\?|#.*$/g,S=/^.*\#/,x,T={};s[v]=C(A,0,L);s[m]=o=C(A,1,k);o.noEscape=function(t){t=t||"";var n=e.map(t.split(""),encodeURIComponent);x=new RegExp(n.join("|"),"g")};o.noEscape(",/");e.deparam=u=function(t,r){var s={},o={"true":!0,"false":!1,"null":null};e.each(t.replace(/\+/g," ").split("&"),function(t,u){var a=u.split("="),f=i(a[0]),l,c=s,h=0,p=f.split("]["),d=p.length-1;if(/\[/.test(p[0])&&/\]$/.test(p[d])){p[d]=p[d].replace(/\]$/,"");p=p.shift().split("[").concat(p);d=p.length-1}else{d=0}if(a.length===2){l=i(a[1]);if(r){l=l&&!isNaN(l)?+l:l==="undefined"?n:o[l]!==n?o[l]:l}if(d){for(;h<=d;h++){f=p[h]===""?c.length:p[h];c=c[f]=h<d?c[f]||(p[h+1]&&isNaN(p[h+1])?{}:[]):l}}else{if(e.isArray(s[f])){s[f].push(l)}else if(s[f]!==n){s[f]=[s[f],l]}else{s[f]=l}}}else if(f){s[f]=r?n:""}});return s};u[v]=C(O,0);u[m]=a=C(O,1);e[g]||(e[g]=function(t){return e.extend(T,t)})({a:b,base:b,iframe:w,img:w,input:w,form:"action",link:b,script:w});h=e[g];e.fn[v]=C(M,v);e.fn[m]=C(M,m);f.pushState=l=function(e,r){if(N(e)&&/^#/.test(e)&&r===n){r=2}var i=e!==n,s=o(t[y][b],i?e:{},i?r:2);t[y][b]=s+(/#/.test(s)?"":"#")};f.getState=c=function(e,t){return e===n||typeof e==="boolean"?a(e):a(t)[e]};f.removeState=function(t){var r={};if(t!==n){r=c();e.each(e.isArray(t)?t:arguments,function(e,t){delete r[t]})}l(r,2)};p[d]=e.extend(p[d],{add:function(t){function i(e){var t=e[m]=o();e.getState=function(e,r){return e===n||typeof e==="boolean"?u(t,e):u(t,r)[e]};r.apply(this,arguments)}var r;if(e.isFunction(t)){r=t;return i}else{r=t.handler;t.handler=i}}})})(jQuery,this);(function(e,t,n){"$:nomunge";function c(e){e=e||t[s][u];return e.replace(/^[^#]*#?(.*)$/,"$1")}var r,i=e.event.special,s="location",o="hashchange",u="href",a=document.documentMode,f=navigator.appVersion.indexOf("MSIE")!=-1&&parseFloat(navigator.appVersion.split("MSIE")[1])<8,l="on"+o in t&&!f;e[o+"Delay"]=100;i[o]=e.extend(i[o],{setup:function(){if(l){return false}e(r.start)},teardown:function(){if(l){return false}e(r.stop)}});r=function(){function h(){a=l=function(e){return e};if(f){i=e('<iframe src="javascript:0"/>').hide().insertAfter("body")[0].contentWindow;l=function(){return c(i.document[s][u])};a=function(e,t){if(e!==t){var n=i.document;n.open().close();n[s].hash="#"+e}};a(c())}}var n={},r,i,a,l;n.start=function(){if(r){return}var n=c();a||h();(function i(){var f=c(),h=l(n);if(f!==n){a(n=f,h);e(t).trigger(o)}else if(h!==n){t[s][u]=t[s][u].replace(/#.*/,"")+"#"+h}r=setTimeout(i,e[o+"Delay"])})()};n.stop=function(){if(!i){r&&clearTimeout(r);r=0}};return n}()})(jQuery,this)
+})(jQuery);
