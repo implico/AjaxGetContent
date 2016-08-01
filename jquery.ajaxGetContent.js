@@ -491,7 +491,7 @@
 							
 							$.fn.ajaxGetContent.lastClickedElement = $.fn.ajaxGetContent.lastChangeUrlElement = $(context);
 							
-							$.fn.ajaxGetContent.load($(context).attr('action') + '?' + $(context).serialize().replace('%5B%5D', '[]'));
+							$.fn.ajaxGetContent.load(($(context).attr('action') || '') + '?' + $(context).serialize().replace('%5B%5D', '[]'));
 							return false;
 						}
 					}
@@ -546,7 +546,7 @@
 							
 							//sending data
 							var callback = formInfo.onReceive ? formInfo.onReceive : function(){};
-							$.ajax( { url: form.attr('action'), data: form.serializeArray(), type: 'POST', success: callback, error: callback, context: context } );
+							$.ajax( { url: form.attr('action') || '', data: form.serializeArray(), type: 'POST', success: callback, error: callback, context: context } );
 							
 							return false;
 						}
