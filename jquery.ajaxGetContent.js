@@ -356,20 +356,29 @@
 		}
 		
 		//auxillary function for scrolling content
-		$.fn.ajaxGetContent.scrollTo = function (id, always, speed, ratio, cb)
+		$.fn.ajaxGetContent.scrollTo = function (selectorOrElementOrOffset, always, speed, ratio, cb)
 		{
 			var cancelEvents = 'wheel.agc DOMMouseScroll.agc mousewheel.agc keyup.agc touchmove.agc';
 			if (typeof speed == 'undefined')
 				speed = 500;
 			
 			var scrollPos = $('html').scrollTop();
-			if (!scrollPos)
+			if (!scrollPos) {
 				scrollPos = $('body').scrollTop();
+			}
 			
-			var isNumber = typeof id == 'number';
+			var offset = $(window).scrollTop();
+			if (typeof selectorOrElementOrOffset === 'number') {
+				offset = selectorOrElementOrOffset;
+			}
+			else if (selectorOrElementOrOffset && (typeof selectorOrElementOrOffset === 'object') && selectorOrElementOrOffset.length) {
+				offset = selectorOrElementOrOffset.offset().top;
+			}
+			else if (typeof selectorOrElementOrOffset === 'string') {
+				offset = $(selectorOrElementOrOffset).offset().top;
+			}
 			
-			if (always || (scrollPos > (isNumber ? id : $(id).offset().top))) {
-				var offset = isNumber ? id : ($(id).length ? $(id).offset().top : $(window).scrollTop());
+			if (always || (scrollPos > offset)) {
 				if (ratio) {
 					offset = ratio % 1 === 0 ? (offset - ratio) : Math.max(0, parseInt(offset - ratio * $w.height()));
 				}
