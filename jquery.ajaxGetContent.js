@@ -1,6 +1,6 @@
 /**
 
- *	jQuery AjaxGetContent 1.8.1
+ *	jQuery AjaxGetContent 1.8.2
 
 
  *
@@ -349,11 +349,17 @@
 		//loads specified url or reloads page (for url = null)
 		$.fn.ajaxGetContent.load = function(url)
 		{
-			if (url == null)
+			if (url == null) {
 				url = location.href;
+			}
 
-			history.pushState( {} , '', url);
-			$w.trigger('popstate.ajaxGetContent', [true]);
+			if (isSupported) {
+				history.pushState( {} , '', url);
+				$w.trigger('popstate.ajaxGetContent', [true]);
+			}
+			else {
+				location.href = url;
+			}
 		}
 		
 		//auxillary function for scrolling content
