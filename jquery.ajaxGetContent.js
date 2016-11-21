@@ -1,6 +1,6 @@
 /**
 
- *	jQuery AjaxGetContent 1.8.0
+ *	jQuery AjaxGetContent 1.8.1
 
 
  *
@@ -232,16 +232,16 @@
 				wasInitialized = $('body').data('ajaxGetContent');
 
 
-		var isOldAndroid = false;		
-		if (!wasInitialized)
+		var isSupported = !!history.pushState;
+		if (!wasInitialized && isSupported)
 		{
 			//Android < 4.3 does not handle pushState properly
 			var ua = navigator.userAgent.toLowerCase(),
     			match = ua.match(/android\s([0-9\.]*)/);
 
-    	isOldAndroid = match && (parseFloat(match[1]) < 4.3);
+    	isSupported = !(match && (parseFloat(match[1]) < 4.3));
 		}
-		
+
 		if (initOptions.formsGet || (initOptions.formsGet === null))
 			options.formsGet = initOptions.formsGet;
 		
@@ -254,6 +254,7 @@
 		$.fn.ajaxGetContent.lastClickedElement = null;
 		
 		if (!wasInitialized) {
+			$.fn.ajaxGetContent.isSupported = isSupported;
 			$.fn.ajaxGetContent.cache = new Array();
 			$.fn.ajaxGetContent.lastChangeUrlElement = null;	//last clicked element, removed on url change by history nav
 			$.fn.ajaxGetContent.lastLoadedUrl = null;
@@ -432,90 +433,188 @@
 			$.fn.ajaxGetContent.cache = new Array();
 		}
 
-  	if (!history.pushState || isOldAndroid) {
-  		return this;	//no support
-  	}
-		
-		//binds popstate event
-		if (!$('body').data('ajaxGetContent')) {
-			$w.on('popstate.ajaxGetContent', function(event, force)
-			{
-				var url = null;
-				var block = false;
-				
-				//checking anchor
-				url = $.fn.ajaxGetContent.getCurrentUrl(true, true);
-				if (!force && $.fn.ajaxGetContent.prevFullUrl)// && (url.indexOf('#') >= 0))
+  	if (isSupported) {
+			//binds popstate event
+			if (!$('body').data('ajaxGetContent')) {
+				$w.on('popstate.ajaxGetContent', function(event, force)
 				{
-					block = ($.fn.ajaxGetContent.getCurrentUrl(true).substr(0) == $.fn.ajaxGetContent.prevFullUrl.substr(0))
-									&& (!$.fn.ajaxGetContent.lastChangeUrlElement || (url.charAt(0) == '#'));//((url.indexOf('#') >= 0) || ($.fn.ajaxGetContent.getCurrentUrl(false) == ''));
-				}
-				
-				if (!block && wasLoaded)
-					sendReceive(true, url);
-
-				$.fn.ajaxGetContent.lastChangeUrlElement = null;
-			});
-			
-			$('body').data('ajaxGetContent', true);
-		}
-		
-		//set the wasLoaded indicator to true after eventual popstate event is fired right after loading the page (Chrome&Safari)
-		$w.load(function() {
-			wasLoaded = false;
-			setTimeout(function() {
-				wasLoaded = true;
-				
-				//set last urls if not clicked before window load
-				if (!$.fn.ajaxGetContent.prevUrl)
-				{
-					$.fn.ajaxGetContent.prevUrl = $.fn.ajaxGetContent.getCurrentUrl();
-					$.fn.ajaxGetContent.prevFullUrl = $.fn.ajaxGetContent.getCurrentUrl(true);
-				}
-			}, 1);
-		});
-
-		
-		//get forms - adding handlers
-		if (options.formsGet != null)
-			$.each(options.formsGet, function(formSelector, callback)
-			{
-				$(formSelector).each(function(i, form)
-				{
-					form = $(form);
-					if (form.data('ajaxGetContent'))
-						return true;
+					var url = null;
+					var block = false;
 					
-					var f = function(context, prevFunc, callback)
+					//checking anchor
+					url = $.fn.ajaxGetContent.getCurrentUrl(true, true);
+					if (!force && $.fn.ajaxGetContent.prevFullUrl)// && (url.indexOf('#') >= 0))
 					{
-						return function()
-						{
-							//inline handler
-							if (prevFunc && !prevFunc.call(context))
-								return false;
-							
-							//callback
-							if (callback && !callback.call(context))
-								return false;
-							
-							$.fn.ajaxGetContent.lastClickedElement = $.fn.ajaxGetContent.lastChangeUrlElement = $(context);
-							
-							$.fn.ajaxGetContent.load(($(context).attr('action') || '') + '?' + $(context).serialize().replace('%5B%5D', '[]'));
-							return false;
-						}
+						block = ($.fn.ajaxGetContent.getCurrentUrl(true).substr(0) == $.fn.ajaxGetContent.prevFullUrl.substr(0))
+										&& (!$.fn.ajaxGetContent.lastChangeUrlElement || (url.charAt(0) == '#'));//((url.indexOf('#') >= 0) || ($.fn.ajaxGetContent.getCurrentUrl(false) == ''));
 					}
 					
-					var prevFunc = form.get(0).onsubmit;
-					form.get(0).onsubmit = null;
-					
-					form.submit(f(this, prevFunc, callback));
-					form.data('ajaxGetContent', true)
+					if (!block && wasLoaded)
+						sendReceive(true, url);
+
+					$.fn.ajaxGetContent.lastChangeUrlElement = null;
 				});
+				
+				$('body').data('ajaxGetContent', true);
+			}
+			
+			//set the wasLoaded indicator to true after eventual popstate event is fired right after loading the page (Chrome&Safari)
+			$w.load(function() {
+				wasLoaded = false;
+				setTimeout(function() {
+					wasLoaded = true;
+					
+					//set last urls if not clicked before window load
+					if (!$.fn.ajaxGetContent.prevUrl)
+					{
+						$.fn.ajaxGetContent.prevUrl = $.fn.ajaxGetContent.getCurrentUrl();
+						$.fn.ajaxGetContent.prevFullUrl = $.fn.ajaxGetContent.getCurrentUrl(true);
+					}
+				}, 1);
 			});
-		
-		
-		//post forms - adding handlers
-		if (options.formsPost != null)
+
+			
+			//get forms - adding handlers
+			if (options.formsGet != null) {
+				$.each(options.formsGet, function(formSelector, callback)
+				{
+					$(formSelector).each(function(i, form)
+					{
+						form = $(form);
+						if (form.data('ajaxGetContent'))
+							return true;
+						
+						var f = function(context, prevFunc, callback)
+						{
+							return function()
+							{
+								//inline handler
+								if (prevFunc && !prevFunc.call(context))
+									return false;
+								
+								//callback
+								if (callback && !callback.call(context))
+									return false;
+								
+								$.fn.ajaxGetContent.lastClickedElement = $.fn.ajaxGetContent.lastChangeUrlElement = $(context);
+								
+								$.fn.ajaxGetContent.load(($(context).attr('action') || '') + '?' + $(context).serialize().replace('%5B%5D', '[]'));
+								return false;
+							}
+						}
+						
+						var prevFunc = form.get(0).onsubmit;
+						form.get(0).onsubmit = null;
+						
+						form.submit(f(this, prevFunc, callback));
+						form.data('ajaxGetContent', true)
+					});
+				});
+			}
+
+
+			//hyperlinks - adding handlers
+			this.each(function(index, element)
+			{
+				$this = $(element);
+				
+				var alreadyEnabled = $this.data('ajaxGetContent');
+
+				var href = $this.attr('href');
+				if (!href)
+					return true;
+				var hrefParams = new String();
+				
+				var ssl = location.href.substr(0, 5) != 'http:';
+				var fullUrl = new String((ssl ? 'https://' : 'http://') + window.location.hostname);
+				if (href.indexOf(fullUrl) == 0)
+					href = href.substr(fullUrl.length);
+
+				//extract get query params
+				if (href.indexOf('?') >= 0)
+				{
+					hrefParams = href.substr(href.indexOf('?'));
+					href = href.substr(0, href.indexOf('?'));
+				}
+				
+				
+				/*
+				 *  checking conditions
+				 */
+				
+				//validating url
+				var targetAttr = $this.attr('target');
+				var invalidUrl = 	/*(href.substr(0,1) != '/') || */(href.charAt(0) == '#') || (typeof targetAttr !== 'undefined' && targetAttr !== false);
+									
+
+				//checking onUrlCheck callback
+				var onHrefCheck = options.onHrefCheck(href, hrefParams);
+					
+				//checking onElementCheck callback
+				var onElementCheck = options.onElementCheck($this);
+				
+				//checking excluding element attributes
+				var excludeAttr = false;
+				$.each(options.excludeAttr, function(i, v)
+				{
+					if ($this.attr(i) && ($this.attr(i).indexOf(v) == 0))
+					{
+						excludeAttr = true;
+						return;
+					}
+				});
+				
+				//block when element has onclick event
+				var hasOnClick = $this.get(0).onclick != null;
+				
+				
+				/*
+				 *  end of checking conditions
+				 */
+						
+				
+				if (!alreadyEnabled && !invalidUrl && onHrefCheck && onElementCheck && !excludeAttr && !hasOnClick)
+				{
+					$this.data('ajaxGetContent', true);
+					$this.click(function(event)
+					{
+						var $this = $(this);
+						href = $(this).attr('href');
+						if (href.indexOf('?') >= 0)
+						{
+							hrefParams = href.substr(href.indexOf('?'));
+							href = href.substr(0, href.indexOf('?'));
+						}
+						
+						//checking onUrlCheck callback
+						if (!options.onHrefCheck(href, hrefParams))
+							return true;
+							
+						//checking onElementCheck callback
+						if (!options.onElementCheck($this))
+							return true;
+						
+						if (event && event.which && event.which != 1)
+							return true;
+						
+						//check if url is a base url, if not - load baseUrl page with ajax link
+						var hrefNoAnchor = new String(window.location.href);
+						if (hrefNoAnchor.indexOf('#') >= 0)
+							hrefNoAnchor = hrefNoAnchor.substr(0, hrefNoAnchor.indexOf('#'));
+						
+						$this.data('options', options);
+						$.fn.ajaxGetContent.lastClickedElement = $.fn.ajaxGetContent.lastChangeUrlElement = $this;
+				
+						$.fn.ajaxGetContent.load(href + hrefParams);
+						
+						return false;
+					});
+				}
+			});
+		}
+
+		//post forms - adding handlers (if unsupported too)
+		if (options.formsPost != null) {
 			$.each(options.formsPost, function(formSelector, formInfo)
 			{
 				$(formSelector).each(function(i, form)
@@ -575,107 +674,7 @@
 					form.data('ajaxGetContent', true)
 				});
 			});
-		
-		
-		//hyperlinks - adding handlers
-		return this.each(function(index, element)
-		{
-			$this = $(element);
-			
-			var alreadyEnabled = $this.data('ajaxGetContent');
-
-			var href = $this.attr('href');
-			if (!href)
-				return true;
-			var hrefParams = new String();
-			
-			var ssl = location.href.substr(0, 5) != 'http:';
-			var fullUrl = new String((ssl ? 'https://' : 'http://') + window.location.hostname);
-			if (href.indexOf(fullUrl) == 0)
-				href = href.substr(fullUrl.length);
-
-			//extract get query params
-			if (href.indexOf('?') >= 0)
-			{
-				hrefParams = href.substr(href.indexOf('?'));
-				href = href.substr(0, href.indexOf('?'));
-			}
-			
-			
-			/*
-			 *  checking conditions
-			 */
-			
-			//validating url
-			var targetAttr = $this.attr('target');
-			var invalidUrl = 	/*(href.substr(0,1) != '/') || */(href.charAt(0) == '#') || (typeof targetAttr !== 'undefined' && targetAttr !== false);
-								
-
-			//checking onUrlCheck callback
-			var onHrefCheck = options.onHrefCheck(href, hrefParams);
-				
-			//checking onElementCheck callback
-			var onElementCheck = options.onElementCheck($this);
-			
-			//checking excluding element attributes
-			var excludeAttr = false;
-			$.each(options.excludeAttr, function(i, v)
-			{
-				if ($this.attr(i) && ($this.attr(i).indexOf(v) == 0))
-				{
-					excludeAttr = true;
-					return;
-				}
-			});
-			
-			//block when element has onclick event
-			var hasOnClick = $this.get(0).onclick != null;
-			
-			
-			/*
-			 *  end of checking conditions
-			 */
-					
-			
-			if (!alreadyEnabled && !invalidUrl && onHrefCheck && onElementCheck && !excludeAttr && !hasOnClick)
-			{
-				$this.data('ajaxGetContent', true);
-				$this.click(function(event)
-				{
-					var $this = $(this);
-					href = $(this).attr('href');
-					if (href.indexOf('?') >= 0)
-					{
-						hrefParams = href.substr(href.indexOf('?'));
-						href = href.substr(0, href.indexOf('?'));
-					}
-					
-					//checking onUrlCheck callback
-					if (!options.onHrefCheck(href, hrefParams))
-						return true;
-						
-					//checking onElementCheck callback
-					if (!options.onElementCheck($this))
-						return true;
-					
-					if (event && event.which && event.which != 1)
-						return true;
-					
-					//check if url is a base url, if not - load baseUrl page with ajax link
-					var hrefNoAnchor = new String(window.location.href);
-					if (hrefNoAnchor.indexOf('#') >= 0)
-						hrefNoAnchor = hrefNoAnchor.substr(0, hrefNoAnchor.indexOf('#'));
-					
-					$this.data('options', options);
-					$.fn.ajaxGetContent.lastClickedElement = $.fn.ajaxGetContent.lastChangeUrlElement = $this;
-			
-					$.fn.ajaxGetContent.load(href + hrefParams);
-					
-					return false;
-				});
-			}
-		});
-	
+		}
 	};
 
 })(jQuery);
